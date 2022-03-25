@@ -185,6 +185,7 @@ class Bot(User):
             await self.chat_event()
             await self.weibo_event()
             await self.run_action()
+            self.logger.info("Heartbeat")
             await asyncio.sleep(self.loop_interval)
     
     def run(self):

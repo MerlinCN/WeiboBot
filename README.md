@@ -49,3 +49,8 @@ if __name__ == '__main__':
 ```
 
 
+
+## 示例
+[好看Bot](https://github.com/MerlinCN/WeiboWatchdog)
+
+> 一个转发小姐姐的Bot
