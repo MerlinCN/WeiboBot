@@ -119,7 +119,7 @@ class NetTool:
     async def weibo_info(self, mid: Union[str, int]) -> dict:
         r = self.mainSession.get(f"https://m.weibo.cn/detail/{mid}", headers=self.header)
         try:
-            return json.loads(re.findall(r'(?<=render_data = \[)[\s\S]*(?=]\[0\])', r.text)[0])["status"]
+            return json.loads(re.findall(r'(?<=render_data = \[)[\s\S]*(?=\]\[0\])', r.text)[0])["status"]
         except Exception:
             raise RequestError(traceback.format_exc())
     

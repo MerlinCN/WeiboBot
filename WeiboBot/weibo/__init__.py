@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, List
 
 from WeiboBot.util import *
 
@@ -108,7 +108,7 @@ class Weibo:
     def detail_url(self) -> str:
         return f"https://m.weibo.cn/detail/{self.id}"
     
-    def raw_text(self) -> str:
+    def full_text(self) -> str:
         """
         未格式化的原文本
         :return:
@@ -130,10 +130,10 @@ class Weibo:
             url = list(self.page_info["urls"].values())[0]
         return url
     
-    def image_list(self) -> list[str]:
+    def image_list(self) -> List[str]:
         return [img["large"]["url"] for img in self.pics]
     
-    def thumbnail_image_list(self) -> list[str]:
+    def thumbnail_image_list(self) -> List[str]:
         return [img["url"] for img in self.pics]  # 微博图片(缩略图)
     
     def is_visible(self) -> bool:
