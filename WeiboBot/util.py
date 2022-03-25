@@ -1,6 +1,7 @@
 from typing import Dict
+from .log import Log
 
-__all__ = ["chat_header", "main_header", "IntField", "StrField", "BoolField", "DictField", "ListField"]
+__all__ = ["chat_header", "main_header", "IntField", "StrField", "BoolField", "DictField", "ListField", "get_logger"]
 
 
 def main_header(cookies: bytes) -> Dict[str, str]:
@@ -82,3 +83,7 @@ def DictField() -> dict:
 
 def ListField() -> list:
     return []
+
+
+def get_logger():
+    return Log('WeiboBot')

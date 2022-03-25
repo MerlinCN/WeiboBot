@@ -29,6 +29,7 @@ class NetTool:
         self.chat_header = chat_header(bytes(self.cookies, encoding="utf-8"))
         
         self.st_times = 0  # 获取st的次数
+        self.logger = get_logger()
     
     def add_ref(self, value: str) -> Dict[str, str]:
         self.header["referer"] = value
@@ -78,7 +79,7 @@ class NetTool:
             data = await self.get("https://m.weibo.cn/api/config")
         except RequestError:
             if self.st_times > 5:
-                print("获取st失败!")
+                self.logger.error("获取st失败!")
                 st = self.header["x-xsrf-token"]
                 return st
             self.st_times += 1
@@ -118,7 +119,7 @@ class NetTool:
     async def weibo_info(self, mid: Union[str, int]) -> dict:
         r = self.mainSession.get(f"https://m.weibo.cn/detail/{mid}", headers=self.header)
         try:
-            return json.loads(re.findall(r'(?<=render_data = \[)[\s\S]*(?=]\[0])', r.text)[0])["status"]
+            return json.loads(re.findall(r'(?<=render_data = \[)[\s\S]*(?=]\[0\])', r.text)[0])["status"]
         except Exception:
             raise RequestError(traceback.format_exc())
     

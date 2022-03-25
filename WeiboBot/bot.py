@@ -7,22 +7,28 @@ from .message import Chat
 from .net_tool import NetTool
 from .user import User
 from .weibo import Weibo
+from .action import Action
+from .log import Log
 
 
 class Bot(User):
-    def __init__(self, userName: str = "", password: str = "", cookies: str = ""):
+    def __init__(self, userName: str = "", password: str = "", cookies: str = "", action_interval=30):
         super(Bot, self).__init__()
         self.nettool = NetTool(userName, password, cookies)
         
         self.msg_handler: List[Callable] = []
         self.weibo_handler: List[Callable] = []
         self.weibo_read = set()
+        
+        self.action_list: list[Action] = []  # 待执行的动作列表
+        self.action_interval = action_interval
+        self.logger = Log("WeiboBot")
     
     async def login(self):
         login_result, self.id = await self.nettool.login()
         
         if login_result is True:
-            print(f"登录成功")
+            self.logger.info(f"登录成功")
         else:
             raise LoginError("登录失败")
         
@@ -34,11 +40,12 @@ class Bot(User):
             raise RequestError("获取用户信息失败")
         self.parse(raw_data["data"]["user"])
         
-        print(f"用户名:{self.screen_name},关注:{self.follow_count},粉丝:{self.followers_count},微博数量:{self.statuses_count}")
-        print(f"微博简介:{self.description}")
-        print(f"微博地址:{self.profile_url}")
-        print(f"微博头像:{self.profile_image_url}")
-        print(f"微博背景图:{self.cover_image_phone}")
+        self.logger.info(
+            f"用户名:{self.screen_name},关注:{self.follow_count},粉丝:{self.followers_count},微博数量:{self.statuses_count}")
+        self.logger.info(f"微博简介:{self.description}")
+        self.logger.info(f"微博地址:{self.profile_url}")
+        self.logger.info(f"微博头像:{self.profile_image_url}")
+        self.logger.info(f"微博背景图:{self.cover_image_phone}")
     
     async def get_weibo(self, mid: Union[str, int]) -> Weibo:
         """
@@ -50,10 +57,9 @@ class Bot(User):
         raw_data = await self.nettool.weibo_info(mid)
         oWeibo = Weibo()
         oWeibo.parse(raw_data)
-        print(f"获取微博成功")
         return oWeibo
     
-    async def post_weibo(self, content: str, visible: VISIBLE = VISIBLE.ALL) -> Weibo:
+    async def _post(self, content: str, visible: VISIBLE = VISIBLE.ALL) -> Weibo:
         """
         发布微博
         
@@ -61,15 +67,26 @@ class Bot(User):
         :param visible:可见性
         :return:新发出的微博
         """
-        post_result = await self.nettool.post_weibo(content, visible)
-        if post_result["ok"] == 0:
-            raise RequestError(f"错误类型{post_result['errno']},{post_result['msg']}")
+        result = await self.nettool.post_weibo(content, visible)
+        self.check_result(result)
         oWeibo = Weibo()
-        oWeibo.parse(post_result["data"])
-        print(f"发送微博成功")
+        oWeibo.parse(result["data"])
+        self.logger.info(f"发送微博成功")
         return oWeibo
     
-    async def repost(self, mid: Union[str, int], content: str = "转发微博", dualPost: bool = False) -> Weibo:
+    def check_result(self, result: dict):
+        if result["ok"] == 0:
+            if result['errno'] in WEIBO_WARNING:
+                self.logger.warning(f"错误类型{result['errno']},{result['msg']}")
+            raise RequestError(f"错误类型{result['errno']},{result['msg']}")
+    
+    def post_action(self, content: str, visible: VISIBLE = VISIBLE.ALL):
+        self.action_list.append(Action(self._post, content, visible))
+    
+    def repost_action(self, mid: Union[str, int], content: str = "转发微博", dualPost: bool = False):
+        self.action_list.append(Action(self._repost, mid, content, dualPost))
+    
+    async def _repost(self, mid: Union[str, int], content: str = "转发微博", dualPost: bool = False) -> Weibo:
         """
         转发微博
         
@@ -78,27 +95,23 @@ class Bot(User):
         :param dualPost: 是否同时评论
         :return:新发出的微博
         """
-        post_result = await self.nettool.repost_weibo(mid, content, dualPost)
-        if post_result["ok"] == 0:
-            raise RequestError(f"错误类型{post_result['errno']},{post_result['msg']}")
+        result = await self.nettool.repost_weibo(mid, content, dualPost)
+        self.check_result(result)
         oWeibo = Weibo()
-        oWeibo.parse(post_result["data"])
-        print(f"转发微博成功")
+        oWeibo.parse(result["data"])
+        self.logger.info(f"转发微博成功")
         return oWeibo
     
     async def send_chat(self, uid: Union[str, int], content: str):
         result = await self.nettool.send_chat(uid, content)
-        if result["ok"] == 0:
-            raise RequestError(f"错误类型{result['errno']},{result['msg']}")
+        self.check_result(result)
         oChat = Chat()
         oChat.parse(result["data"])
         return oChat
     
     async def chat_list(self, page: int = 1):
         result = await self.nettool.chat_list(page)
-        if result["ok"] == 0:
-            raise RequestError(f"错误类型{result['errno']},{result['msg']}")
-        
+        self.check_result(result)
         return result["data"]
     
     async def chat_event(self):
@@ -114,9 +127,7 @@ class Bot(User):
     
     async def refresh_page(self):
         result = await self.nettool.refresh_page()
-        if result["ok"] == 0:
-            raise RequestError(f"错误类型{result['errno']},{result['msg']}")
-        
+        self.check_result(result)
         return result["data"]
     
     async def weibo_event(self):
@@ -125,24 +136,20 @@ class Bot(User):
             if weibo["id"] in self.weibo_read:
                 continue
             self.weibo_read.add(weibo["id"])
-            oWeibo = Weibo()
-            oWeibo.parse(weibo)
-            
+            oWeibo = await self.get_weibo(weibo["id"])
             for func in self.weibo_handler:
                 await func(oWeibo)
     
     async def user_chat(self, uid: Union[str, int], since_id: int = 0):
         result = await self.nettool.user_chat(uid, since_id)
-        if result["ok"] == 0:
-            raise RequestError(f"错误类型{result['errno']},{result['msg']}")
+        self.check_result(result)
         oChat = Chat()
         oChat.parse(result["data"])
         return oChat
     
     async def like(self, mid):
         result = await self.nettool.like(mid)
-        if result["ok"] == 0:
-            raise RequestError(f"错误类型{result['errno']},{result['msg']}")
+        self.check_result(result)
         return result["data"]
     
     def onNewMsg(self, func):
@@ -153,11 +160,26 @@ class Bot(User):
         if func not in self.weibo_handler:
             self.weibo_handler.append(func)
     
+    async def run_action(self):
+        """
+        执行所有的action
+        如果成功或者超过最大尝试次数，则删除action
+        
+        :return:
+        """
+        for action in self.action_list:
+            result, status = await action.run()
+            if status == ACTION.MAX_TRY or status == ACTION.DONE:
+                self.action_list.remove(action)
+            
+            await asyncio.sleep(self.action_interval)
+    
     async def lifecycle(self):
         await asyncio.wait_for(self.login(), timeout=10)
         while True:
             await self.chat_event()
             await self.weibo_event()
+            await self.run_action()
             await asyncio.sleep(1)
     
     def run(self):

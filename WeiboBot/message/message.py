@@ -15,13 +15,15 @@ class Message:
         self.sender_screen_name = StrField()  # 发送者的昵称
         self.text = StrField()  # 内容
         self.attachment = DictField()  # 附件
+        
+        self.logger = get_logger()
     
     def parse(self, data):
         for k, v in data.items():
             if hasattr(self, k):
                 setattr(self, k, v)
             else:
-                print(f'{k} is not a valid attribute, type is {type(v)}')
+                self.logger.warning(f'{k} is not a valid attribute, type is {type(v)}')
     
     def isDm(self):
         """
@@ -36,4 +38,3 @@ class Message:
         :return:
         """
         return self.dm_type == MSG.SUBSCRIPTION.value
-

@@ -28,10 +28,12 @@ class User:
         self.avatar_hd = StrField()  # 高清头像
         self.like = BoolField()  # 是否喜欢
         self.like_me = BoolField()  # 是否喜欢我
+        
+        self.logger = get_logger()
     
     def parse(self, info: Dict):
         for k, v in info.items():
             if hasattr(self, k):
                 setattr(self, k, v)
             else:
-                print(f'{k} is not a valid attribute, type is {type(v)}')
+                self.logger.warning(f'{k} is not a valid attribute, type is {type(v)}')

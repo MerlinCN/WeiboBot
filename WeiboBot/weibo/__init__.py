@@ -79,16 +79,27 @@ class Weibo:
         self.topic_id = StrField()  #
         self.sync_mblog = BoolField()  #
         self.is_imported_topic = BoolField()  #
+        self.longText = DictField()
+        self.mark = StrField()  #
+        self.reward_scheme = StrField()
+        self.state = IntField()  #
+        self.expire_time = IntField()  #
+        self.deleted = StrField()  #
+        self.ad_state = IntField()  #
+        self.verified_type_ext = IntField()
+        self.verified_reason = StrField()
+        self.mlevelSource = StrField()
         # endregion
-
+        
         self.original_weibo: Union[Weibo, None] = None
+        self.logger = get_logger()
     
     def parse(self, data):
         for k, v in data.items():
             if hasattr(self, k):
                 setattr(self, k, v)
             else:
-                print(f'{k} is not a valid attribute, type is {type(v)}')
+                self.logger.warning(f'{k} is not a valid attribute, type is {type(v)}')
         
         if self.retweeted_status != {}:
             self.original_weibo = Weibo()
@@ -96,3 +107,34 @@ class Weibo:
     
     def detail_url(self) -> str:
         return f"https://m.weibo.cn/detail/{self.id}"
+    
+    def raw_text(self) -> str:
+        """
+        未格式化的原文本
+        :return:
+        """
+        if self.longText != {}:
+            return self.longText['longTextContent']
+        else:
+            return self.text
+    
+    def weibo_id(self) -> int:
+        return int(self.id)
+    
+    def user_uid(self) -> int:
+        return int(self.user["id"])
+    
+    def video_url(self) -> str:
+        url = ""
+        if self.page_info.get("type", "") == "video" and "urls" in self.page_info:
+            url = list(self.page_info["urls"].values())[0]
+        return url
+    
+    def image_list(self) -> list[str]:
+        return [img["large"]["url"] for img in self.pics]
+    
+    def thumbnail_image_list(self) -> list[str]:
+        return [img["url"] for img in self.pics]  # 微博图片(缩略图)
+    
+    def is_visible(self) -> bool:
+        return self.visible.get('type', 0) == 0
