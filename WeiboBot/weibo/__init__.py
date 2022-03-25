@@ -92,7 +92,7 @@ class Weibo:
         # endregion
         
         self.original_weibo: Union[Weibo, None] = None
-        self.logger = get_logger()
+        self.logger = get_logger(__name__)
     
     def parse(self, data):
         for k, v in data.items():

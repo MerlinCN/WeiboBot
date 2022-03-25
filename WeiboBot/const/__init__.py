@@ -1,6 +1,6 @@
 from enum import Enum
 
-__all__ = ["VISIBLE", "MSG", "ACTION", "WEIBOERR","WEIBO_WARNING"]
+__all__ = ["VISIBLE", "MSG", "ACTION", "WEIBOERR", "WEIBO_WARNING"]
 
 
 class VISIBLE(Enum):

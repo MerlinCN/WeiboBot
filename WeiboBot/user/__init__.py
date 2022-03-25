@@ -29,7 +29,7 @@ class User:
         self.like = BoolField()  # 是否喜欢
         self.like_me = BoolField()  # 是否喜欢我
         
-        self.logger = get_logger()
+        self.logger = get_logger(__name__)
     
     def parse(self, info: Dict):
         for k, v in info.items():

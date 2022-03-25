@@ -16,7 +16,7 @@ class Chat:
         self.user_dict: Dict[int, User] = {}
         self.msg_list: List[Message] = []
         
-        self.logger = get_logger()
+        self.logger = get_logger(__name__)
     
     def parse(self, data):
         for k, v in data.items():

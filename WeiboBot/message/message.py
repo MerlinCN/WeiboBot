@@ -1,5 +1,5 @@
-from WeiboBot.util import *
 from WeiboBot.const import *
+from WeiboBot.util import *
 
 
 class Message:
@@ -16,7 +16,7 @@ class Message:
         self.text = StrField()  # 内容
         self.attachment = DictField()  # 附件
         
-        self.logger = get_logger()
+        self.logger = get_logger(__name__)
     
     def parse(self, data):
         for k, v in data.items():

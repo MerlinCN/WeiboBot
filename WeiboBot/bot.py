@@ -1,14 +1,14 @@
 import asyncio
 from typing import Union, List, Callable
 
+from .action import Action
 from .const import *
 from .exception import *
 from .message import Chat
 from .net_tool import NetTool
 from .user import User
+from .util import *
 from .weibo import Weibo
-from .action import Action
-from .log import Log
 
 
 class Bot(User):
@@ -22,7 +22,7 @@ class Bot(User):
         
         self.action_list: list[Action] = []  # 待执行的动作列表
         self.action_interval = action_interval
-        self.logger = Log("WeiboBot")
+        self.logger = get_logger(__name__)
         self.loop_interval = loop_interval
     
     async def login(self):

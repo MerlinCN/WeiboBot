@@ -1,5 +1,6 @@
-from WeiboBot.const import ACTION
 import traceback
+
+from WeiboBot.const import ACTION
 from WeiboBot.util import *
 
 
@@ -10,7 +11,7 @@ class Action:
         self.kwargs = kwargs
         self.status = ACTION.UNDONE
         self.run_time = 0
-        self.logger = get_logger()
+        self.logger = get_logger(__name__)
     
     async def run(self):
         if self.run_time > 5:

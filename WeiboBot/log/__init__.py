@@ -11,14 +11,14 @@ class Log(Logger):
         if is_print:
             s_handler = logging.StreamHandler(sys.stdout)
             s_handler.setFormatter(
-                logging.Formatter("%(asctime)s - %(levelname)s - %(pathname)s[%(funcName)s][:%(lineno)d] - %(message)s"))
+                logging.Formatter(f"%(asctime)s - %(levelname)s - {name}[%(funcName)s][:%(lineno)d] - %(message)s"))
             self.addHandler(s_handler)
         if is_file:
-            log_path = f"{os.getcwd()}/Log/{name}/"
+            log_path = f"{os.getcwd()}/Log/WeiboBot/"
             if not os.path.exists(log_path):
                 os.makedirs(log_path)
-            f_handler = logging.handlers.TimedRotatingFileHandler(log_path + f'/{name}.log', encoding='utf8')
+            f_handler = logging.handlers.TimedRotatingFileHandler(log_path + f'/WeiboBot.log', encoding='utf8')
             f_handler.suffix = ".%Y%m%d_%H"
             f_handler.setFormatter(
-                logging.Formatter("%(asctime)s - %(levelname)s - %(pathname)s[%(funcName)s][:%(lineno)d] - %(message)s"))
+                logging.Formatter(f"%(asctime)s - %(levelname)s - {name}[%(funcName)s][:%(lineno)d] - %(message)s"))
             self.addHandler(f_handler)

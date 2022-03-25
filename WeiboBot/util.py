@@ -1,4 +1,5 @@
 from typing import Dict
+
 from .log import Log
 
 __all__ = ["chat_header", "main_header", "IntField", "StrField", "BoolField", "DictField", "ListField", "get_logger"]
@@ -85,5 +86,5 @@ def ListField() -> list:
     return []
 
 
-def get_logger():
-    return Log('WeiboBot')
+def get_logger(name: str) -> Log:
+    return Log(name)

@@ -29,7 +29,7 @@ class NetTool:
         self.chat_header = chat_header(bytes(self.cookies, encoding="utf-8"))
         
         self.st_times = 0  # 获取st的次数
-        self.logger = get_logger()
+        self.logger = get_logger(__name__)
     
     def add_ref(self, value: str) -> Dict[str, str]:
         self.header["referer"] = value
