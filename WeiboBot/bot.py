@@ -182,9 +182,11 @@ class Bot(User):
     async def lifecycle(self):
         await asyncio.wait_for(self.login(), timeout=10)
         while True:
-            await self.chat_event()
-            await self.weibo_event()
-            await self.run_action()
+            await asyncio.gather(
+                self.chat_event(),
+                self.weibo_event(),
+                self.run_action(),
+            )
             self.logger.info("Heartbeat")
             await asyncio.sleep(self.loop_interval)
     
