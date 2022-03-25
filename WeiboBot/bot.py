@@ -12,7 +12,7 @@ from .log import Log
 
 
 class Bot(User):
-    def __init__(self, userName: str = "", password: str = "", cookies: str = "", action_interval=30):
+    def __init__(self, userName: str = "", password: str = "", cookies: str = "", loop_interval=5, action_interval=30):
         super(Bot, self).__init__()
         self.nettool = NetTool(userName, password, cookies)
         
@@ -23,6 +23,7 @@ class Bot(User):
         self.action_list: list[Action] = []  # 待执行的动作列表
         self.action_interval = action_interval
         self.logger = Log("WeiboBot")
+        self.loop_interval = loop_interval
     
     async def login(self):
         login_result, self.id = await self.nettool.login()
@@ -131,7 +132,11 @@ class Bot(User):
         return result["data"]
     
     async def weibo_event(self):
-        result = await self.refresh_page()
+        try:
+            result = await self.refresh_page()
+        except RequestError as e:  # 刷新页面失败,可跳过此次刷新
+            self.logger.warning(e)
+            return
         for weibo in result["statuses"]:
             if weibo["id"] in self.weibo_read:
                 continue
@@ -180,7 +185,7 @@ class Bot(User):
             await self.chat_event()
             await self.weibo_event()
             await self.run_action()
-            await asyncio.sleep(1)
+            await asyncio.sleep(self.loop_interval)
     
     def run(self):
         try:
