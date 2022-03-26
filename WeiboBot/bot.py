@@ -118,17 +118,21 @@ class Bot(User):
     async def chat_event(self):
         try:
             data = await self.chat_list()
-            for dChat in data:
-                unread = dChat["unread"]
-                scheme = dChat["scheme"]
-                if unread > 0 and scheme.find("gid=") == -1:
-                    oChat = await self.user_chat(dChat['user']["id"])
-                    oChat.msg_list = [oMsg for oMsg in oChat.msg_list[:unread] if oMsg.isDm()]
-                    for func in self.msg_handler:
-                        await func(oChat)
         except RequestError as e:
             self.logger.warning(f"获取聊天列表失败:{e}")
             return
+        for dChat in data:
+            unread = dChat["unread"]
+            scheme = dChat["scheme"]
+            if unread > 0 and scheme.find("gid=") == -1:
+                try:
+                    oChat = await self.user_chat(dChat['user']["id"])
+                except RequestError as e:
+                    self.logger.warning(f"获取聊天失败:{e}")
+                    continue
+                oChat.msg_list = [oMsg for oMsg in oChat.msg_list[:unread] if oMsg.isDm()]
+                for func in self.msg_handler:
+                    await func(oChat)
     
     async def refresh_page(self):
         result = await self.nettool.refresh_page()
@@ -145,7 +149,11 @@ class Bot(User):
             if weibo["id"] in self.weibo_read:
                 continue
             self.weibo_read.add(weibo["id"])
-            oWeibo = await self.get_weibo(weibo["id"])
+            try:
+                oWeibo = await self.get_weibo(weibo["id"])
+            except RequestError as e:
+                self.logger.warning(f"获取微博失败:{e}")
+                continue
             for func in self.weibo_handler:
                 await func(oWeibo)
     

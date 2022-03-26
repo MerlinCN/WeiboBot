@@ -122,8 +122,9 @@ class NetTool:
         r = self.mainSession.get(f"https://m.weibo.cn/detail/{mid}", headers=self.header)
         try:
             return json.loads(re.findall(r'(?<=render_data = \[)[\s\S]*(?=\]\[0\])', r.text)[0])["status"]
-        except Exception:
-            raise RequestError(traceback.format_exc())
+        except IndexError:
+            self.logger.error(f"https://m.weibo.cn/detail/{mid} 解析错误 \n{r.text}")
+            raise RequestError("解析微博信息错误")
     
     async def send_chat(self, uid: Union[str, int], content: str):
         params = {
