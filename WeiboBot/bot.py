@@ -77,7 +77,7 @@ class Bot(User):
     
     def check_result(self, result: dict):
         if result["ok"] == 0:
-            if result['errno'] in WEIBO_WARNING:
+            if result.get("errno",0) in WEIBO_WARNING:
                 self.logger.warning(f"错误类型{result['errno']},{result['msg']}")
             raise RequestError(f"错误类型{result['errno']},{result['msg']}")
     
@@ -152,7 +152,7 @@ class Bot(User):
         oChat.parse(result["data"])
         return oChat
     
-    async def like(self, mid):
+    async def like_weibo(self, mid):
         result = await self.nettool.like(mid)
         self.check_result(result)
         return result["data"]

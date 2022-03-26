@@ -1,6 +1,6 @@
+import asyncio
 import json
 import re
-import time
 import traceback
 from typing import Dict, Tuple, Union
 
@@ -47,8 +47,10 @@ class NetTool:
         except Exception:
             raise RequestError(traceback.format_exc())
     
-    async def post(self, url: str, params: Dict = None) -> Dict:
-        r = self.mainSession.post(url, headers=self.header, data=params)
+    async def post(self, url: str, params: Dict = None, header=None) -> Dict:
+        if header is None:
+            header = self.header
+        r = self.mainSession.post(url, headers=header, data=params)
         if r.status_code != 200:
             raise RequestError(f"网络错误!状态码:{r.status_code}\n{r.text}")
         try:
@@ -83,7 +85,7 @@ class NetTool:
                 st = self.header["x-xsrf-token"]
                 return st
             self.st_times += 1
-            time.sleep(0.5)
+            await asyncio.sleep(0.5)
             return await self.st()
         st = data["data"]["st"]
         return st
