@@ -77,7 +77,7 @@ class Bot(User):
     
     def check_result(self, result: dict):
         if result["ok"] == 0:
-            if result.get("errno",0) in WEIBO_WARNING:
+            if result.get("errno", 0) in WEIBO_WARNING:
                 self.logger.warning(f"错误类型{result['errno']},{result['msg']}")
             raise RequestError(f"错误类型{result['errno']},{result['msg']}")
     
@@ -116,15 +116,19 @@ class Bot(User):
         return result["data"]
     
     async def chat_event(self):
-        data = await self.chat_list()
-        for dChat in data:
-            unread = dChat["unread"]
-            scheme = dChat["scheme"]
-            if unread > 0 and scheme.find("gid=") == -1:
-                oChat = await self.user_chat(dChat['user']["id"])
-                oChat.msg_list = [oMsg for oMsg in oChat.msg_list[:unread] if oMsg.isDm()]
-                for func in self.msg_handler:
-                    await func(oChat)
+        try:
+            data = await self.chat_list()
+            for dChat in data:
+                unread = dChat["unread"]
+                scheme = dChat["scheme"]
+                if unread > 0 and scheme.find("gid=") == -1:
+                    oChat = await self.user_chat(dChat['user']["id"])
+                    oChat.msg_list = [oMsg for oMsg in oChat.msg_list[:unread] if oMsg.isDm()]
+                    for func in self.msg_handler:
+                        await func(oChat)
+        except RequestError as e:
+            self.logger.warning(f"获取聊天列表失败:{e}")
+            return
     
     async def refresh_page(self):
         result = await self.nettool.refresh_page()

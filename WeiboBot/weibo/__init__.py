@@ -89,6 +89,11 @@ class Weibo:
         self.verified_type_ext = IntField()
         self.verified_reason = StrField()
         self.mlevelSource = StrField()
+        self.ipRegion = StrField()
+        self.stickerID = StrField()
+        self.filterID = StrField()
+        self.buttons = ListField()
+        self.is_vote = IntField()
         # endregion
         
         self.original_weibo: Union[Weibo, None] = None
@@ -99,7 +104,7 @@ class Weibo:
             if hasattr(self, k):
                 setattr(self, k, v)
             else:
-                self.logger.warning(f'{k} is not a valid attribute, type is {type(v)}')
+                self.logger.warning(f'{k} is not a valid attribute, type is {type(v)}, id is {self.id}')
         
         if self.retweeted_status != {}:
             self.original_weibo = Weibo()
