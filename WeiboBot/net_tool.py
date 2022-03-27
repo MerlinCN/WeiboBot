@@ -79,7 +79,7 @@ class NetTool:
         """
         try:
             data = await self.get("https://m.weibo.cn/api/config")
-        except RequestError:
+        except Exception:
             if self.st_times > 5:
                 self.logger.error("获取st失败!")
                 st = self.header["x-xsrf-token"]

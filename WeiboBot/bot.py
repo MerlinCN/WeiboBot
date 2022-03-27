@@ -118,7 +118,7 @@ class Bot(User):
     async def chat_event(self):
         try:
             data = await self.chat_list()
-        except RequestError as e:
+        except Exception as e:
             self.logger.warning(f"获取聊天列表失败:{e}")
             return
         for dChat in data:
@@ -127,7 +127,7 @@ class Bot(User):
             if unread > 0 and scheme.find("gid=") == -1:
                 try:
                     oChat = await self.user_chat(dChat['user']["id"])
-                except RequestError as e:
+                except Exception as e:
                     self.logger.warning(f"获取聊天失败:{e}")
                     continue
                 oChat.msg_list = [oMsg for oMsg in oChat.msg_list[:unread] if oMsg.isDm()]
@@ -142,7 +142,7 @@ class Bot(User):
     async def weibo_event(self):
         try:
             result = await self.refresh_page()
-        except RequestError as e:  # 刷新页面失败,可跳过此次刷新
+        except Exception as e:  # 刷新页面失败,可跳过此次刷新
             self.logger.warning(e)
             return
         for weibo in result["statuses"]:
