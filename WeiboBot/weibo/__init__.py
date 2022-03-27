@@ -143,3 +143,4 @@ class Weibo:
     
     def is_visible(self) -> bool:
         return self.visible.get('type', 0) == 0
+

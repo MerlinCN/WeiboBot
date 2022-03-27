@@ -151,7 +151,7 @@ class Bot(User):
             self.weibo_read.add(weibo["id"])
             try:
                 oWeibo = await self.get_weibo(weibo["id"])
-            except RequestError as e:
+            except Exception as e:
                 self.logger.warning(f"获取微博失败:{e}")
                 continue
             for func in self.weibo_handler:
