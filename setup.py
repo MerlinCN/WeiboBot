@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf8") as fh:
 
 setuptools.setup(
     name="WeiboBot",
-    version="0.1.0",
+    version="0.1.1",
     author="Merlin",
     author_email="merlin@merlinblog.cn",
     description="基于微博H5 API开发的机器人框架",
@@ -13,7 +13,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/MerlinCN/WeiboBot",
     packages=setuptools.find_packages(),
-    install_requires=["requests"],
+    install_requires=["requests", "tinydb"],
     classifiers=[
         "Programming Language :: Python :: 3.7",
         "License :: OSI Approved :: GNU Affero General Public License v3",

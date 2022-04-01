@@ -139,3 +139,6 @@ tmp/
 # IDE Directories
 .vscode/
 .idea/
+
+#cofig json
+*.json

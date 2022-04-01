@@ -26,31 +26,33 @@ WeiboBot 是一个基于微博H5 API开发的机器人框架，提供了一个�
 from WeiboBot import Bot
 from WeiboBot.message import Chat
 from WeiboBot.weibo import Weibo
-
+from WeiboBot.comment import Comment
 cookies = "your cookies"
 myBot = Bot(cookies=cookies)
 
 
 @myBot.onNewMsg
-async def onMsg(oChat: Chat):
+async def on_msg(oChat: Chat):
     for msg in oChat.msg_list:  # 消息列表
         print(f"{msg.sender_screen_name}:{msg.text}")
 
 
 @myBot.onNewWeibo
-async def onWeibo(oWeibo: Weibo):
+async def on_weibo(oWeibo: Weibo):
     if oWeibo.original_weibo is None:  # 原创微博
         print(f"{oWeibo.text}")
 
+@myBot.onMentionCmt
+async def on_mention_cmt(cmt: Comment):
+    print(f"{cmt.text}") # 被评论@了
 
 if __name__ == '__main__':
     myBot.run()
 
 ```
 
-
-
 ## 示例
-[好看Bot](https://github.com/MerlinCN/WeiboWatchdog)
+
+[好康Bot](https://github.com/MerlinCN/WeiboWatchdog)
 
 > 一个转发小姐姐的Bot

@@ -94,6 +94,8 @@ class Weibo:
         self.filterID = StrField()
         self.buttons = ListField()
         self.is_vote = IntField()
+        self.comment_manage_info = DictField()
+        self.attitude_dynamic_adid = StrField()
         # endregion
         
         self.original_weibo: Union[Weibo, None] = None
@@ -143,4 +145,3 @@ class Weibo:
     
     def is_visible(self) -> bool:
         return self.visible.get('type', 0) == 0
-

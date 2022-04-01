@@ -17,7 +17,7 @@ class Chat:
         self.msg_list: List[Message] = []
         
         self.logger = get_logger(__name__)
-    
+        
     def parse(self, data):
         for k, v in data.items():
             if k == "msgs":

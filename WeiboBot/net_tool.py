@@ -1,7 +1,6 @@
 import asyncio
 import json
 import re
-import traceback
 from typing import Dict, Tuple, Union
 
 import requests
@@ -41,11 +40,8 @@ class NetTool:
         r = self.mainSession.get(url, headers=header, params=params)
         if r.status_code != 200:
             raise RequestError(f"网络错误!状态码:{r.status_code}\n{r.text}")
-        try:
-            result = r.json()
-            return result
-        except Exception:
-            raise RequestError(traceback.format_exc())
+        result = r.json()
+        return result
     
     async def post(self, url: str, params: Dict = None, header=None) -> Dict:
         if header is None:
@@ -53,11 +49,8 @@ class NetTool:
         r = self.mainSession.post(url, headers=header, data=params)
         if r.status_code != 200:
             raise RequestError(f"网络错误!状态码:{r.status_code}\n{r.text}")
-        try:
-            result = r.json()
-            return result
-        except Exception:
-            raise RequestError(traceback.format_exc())
+        result = r.json()
+        return result
     
     async def login(self) -> Tuple[bool, int]:
         url = "https://m.weibo.cn/api/config"
@@ -142,6 +135,10 @@ class NetTool:
     async def chat_list(self, page: int):
         params = {"page": page}
         return await self.get("https://m.weibo.cn/message/msglist", params=params)
+    
+    async def mentions_cmt(self, page: int):
+        params = {"page": page}
+        return await self.get("https://m.weibo.cn/message/mentionsCmt", params=params)
     
     async def refresh_page(self):
         self.add_ref("https://m.weibo.cn/")

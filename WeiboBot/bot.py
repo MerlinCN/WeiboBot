@@ -9,6 +9,8 @@ from .net_tool import NetTool
 from .user import User
 from .util import *
 from .weibo import Weibo
+from .comment import Comment
+from tinydb import TinyDB, Query
 
 
 class Bot(User):
@@ -18,12 +20,36 @@ class Bot(User):
         
         self.msg_handler: List[Callable] = []
         self.weibo_handler: List[Callable] = []
+        self.mention_cmt_handler: List[Callable] = []
         self.weibo_read = set()
         
         self.action_list: list[Action] = []  # 待执行的动作列表
         self.action_interval = action_interval
         self.logger = get_logger(__name__)
         self.loop_interval = loop_interval
+        self.db = TinyDB('db.json')
+    
+    def is_weibo_read(self, mid: Union[str, int]) -> bool:
+        weibo_read = self.db.table("weibo_read")
+        q = Query()
+        mid = int(mid)
+        return bool(weibo_read.search(q.mid == mid))
+    
+    def mark_weibo(self, mid: Union[str, int]):
+        mid = int(mid)
+        weibo_read = self.db.table("weibo_read")
+        weibo_read.insert({"mid": mid})
+    
+    def is_mention_cmt_read(self, mid: Union[str, int]) -> bool:
+        mention_cmt_read = self.db.table("mention_cmt_read")
+        q = Query()
+        mid = int(mid)
+        return bool(mention_cmt_read.search(q.mid == mid))
+    
+    def mark_mention_cmt(self, mid: Union[str, int]):
+        mid = int(mid)
+        mention_cmt_read = self.db.table("mention_cmt_read")
+        mention_cmt_read.insert({"mid": mid})
     
     async def login(self):
         login_result, self.id = await self.nettool.login()
@@ -100,7 +126,7 @@ class Bot(User):
         self.check_result(result)
         oWeibo = Weibo()
         oWeibo.parse(result["data"])
-        self.logger.info(f"转发微博成功")
+        self.logger.info(f"转发微博 {oWeibo.detail_url()} 成功")
         return oWeibo
     
     async def send_chat(self, uid: Union[str, int], content: str):
@@ -114,6 +140,33 @@ class Bot(User):
         result = await self.nettool.chat_list(page)
         self.check_result(result)
         return result["data"]
+    
+    async def mentions_cmt_list(self, page: int = 1):
+        result = await self.nettool.mentions_cmt(page)
+        self.check_result(result)
+        result_list = []
+        for dCmt in result["data"]:
+            cmt = Comment()
+            cmt.parse(dCmt)
+            result_list.append(cmt)
+        return result_list
+    
+    async def mentions_cmt_event(self):
+        try:
+            cmt_list = await self.mentions_cmt_list()
+        except Exception as e:
+            self.logger.warning(f"获取@我的评论失败:{e}")
+            return
+        for cmt in cmt_list:
+            if self.is_mention_cmt_read(cmt.mid):
+                continue
+            for func in self.mention_cmt_handler:
+                try:
+                    await func(cmt)
+                except Exception as e:
+                    self.logger.error(f"处理@我的评论失败:{e}")
+                    continue
+            self.mark_mention_cmt(cmt.mid)
     
     async def chat_event(self):
         try:
@@ -132,7 +185,11 @@ class Bot(User):
                     continue
                 oChat.msg_list = [oMsg for oMsg in oChat.msg_list[:unread] if oMsg.isDm()]
                 for func in self.msg_handler:
-                    await func(oChat)
+                    try:
+                        await func(oChat)
+                    except Exception as e:
+                        self.logger.error(f"处理聊天失败:{e}")
+                        continue
     
     async def refresh_page(self):
         result = await self.nettool.refresh_page()
@@ -146,16 +203,20 @@ class Bot(User):
             self.logger.warning(e)
             return
         for weibo in result["statuses"]:
-            if weibo["id"] in self.weibo_read:
+            if self.is_weibo_read(weibo["id"]):
                 continue
-            self.weibo_read.add(weibo["id"])
             try:
                 oWeibo = await self.get_weibo(weibo["id"])
             except Exception as e:
                 self.logger.warning(f"获取微博失败:{e}")
                 continue
             for func in self.weibo_handler:
-                await func(oWeibo)
+                try:
+                    await func(oWeibo)
+                except Exception as e:
+                    self.logger.error(f"处理微博失败:{e}")
+                    continue
+            self.mark_weibo(weibo["id"])
     
     async def user_chat(self, uid: Union[str, int], since_id: int = 0):
         result = await self.nettool.user_chat(uid, since_id)
@@ -177,6 +238,10 @@ class Bot(User):
         if func not in self.weibo_handler:
             self.weibo_handler.append(func)
     
+    def onMentionCmt(self, func):
+        if func not in self.mention_cmt_handler:
+            self.mention_cmt_handler.append(func)
+    
     async def run_action(self):
         """
         执行所有的action
@@ -197,6 +262,7 @@ class Bot(User):
             await asyncio.gather(
                 self.chat_event(),
                 self.weibo_event(),
+                self.mentions_cmt_event(),
                 self.run_action(),
             )
             self.logger.info("Heartbeat")

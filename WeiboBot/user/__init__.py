@@ -28,6 +28,9 @@ class User:
         self.avatar_hd = StrField()  # 高清头像
         self.like = BoolField()  # 是否喜欢
         self.like_me = BoolField()  # 是否喜欢我
+        self.badge = DictField()  # 徽章
+        self.verified_type_ext = IntField()  # 认证类型扩展
+        self.verified_reason = StrField()  # 认证原因
         
         self.logger = get_logger(__name__)
     
