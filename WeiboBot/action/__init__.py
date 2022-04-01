@@ -7,7 +7,7 @@ from WeiboBot.util import *
 class Action:
     def __init__(self, func, *args, **kwargs):
         self.func = func
-        self.arg = args
+        self.args = args
         self.kwargs = kwargs
         self.status = ACTION.UNDONE
         self.run_time = 0
@@ -20,7 +20,7 @@ class Action:
         self.status = ACTION.RUNNING
         self.run_time += 1
         try:
-            result = await self.func(*self.arg, **self.kwargs)
+            result = await self.func(*self.args, **self.kwargs)
         except Exception:
             self.status = ACTION.FAILED
             self.logger.error(traceback.format_exc())

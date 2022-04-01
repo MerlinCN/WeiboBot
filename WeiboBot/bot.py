@@ -29,6 +29,7 @@ class Bot(User):
         self.loop_interval = loop_interval
         self.db = TinyDB('db.json')
     
+    # region 数据库操作
     def is_weibo_read(self, mid: Union[str, int]) -> bool:
         weibo_read = self.db.table("weibo_read")
         q = Query()
@@ -51,6 +52,24 @@ class Bot(User):
         mention_cmt_read = self.db.table("mention_cmt_read")
         mention_cmt_read.insert({"mid": mid})
     
+    def is_weibo_repost(self, mid: Union[str, int]) -> bool:
+        """
+        判断微博是否转发
+        
+        :param mid: 微博id
+        :return: True/False
+        """
+        weibo_repost = self.db.table("weibo_repost")
+        q = Query()
+        mid = int(mid)
+        return bool(weibo_repost.search(q.mid == mid))
+    
+    def mark_weibo_repost(self, mid: Union[str, int]):
+        mid = int(mid)
+        weibo_repost = self.db.table("weibo_repost")
+        weibo_repost.insert({"mid": mid})
+    
+    # endregion
     async def login(self):
         login_result, self.id = await self.nettool.login()
         
@@ -111,6 +130,10 @@ class Bot(User):
         self.action_list.append(Action(self._post, content, visible))
     
     def repost_action(self, mid: Union[str, int], content: str = "转发微博", dualPost: bool = False):
+        for action in self.action_list:
+            if mid in action.args:
+                self.logger.info(f"动作序列中已存在{mid}的转发动作")
+                return
         self.action_list.append(Action(self._repost, mid, content, dualPost))
     
     async def _repost(self, mid: Union[str, int], content: str = "转发微博", dualPost: bool = False) -> Weibo:
@@ -126,6 +149,7 @@ class Bot(User):
         self.check_result(result)
         oWeibo = Weibo()
         oWeibo.parse(result["data"])
+        self.mark_weibo_repost(mid)
         self.logger.info(f"转发微博 {oWeibo.detail_url()} 成功")
         return oWeibo
     
@@ -230,6 +254,7 @@ class Bot(User):
         self.check_result(result)
         return result["data"]
     
+    # region 事件装饰器
     def onNewMsg(self, func):
         if func not in self.msg_handler:
             self.msg_handler.append(func)
@@ -242,6 +267,7 @@ class Bot(User):
         if func not in self.mention_cmt_handler:
             self.mention_cmt_handler.append(func)
     
+    # endregion
     async def run_action(self):
         """
         执行所有的action
