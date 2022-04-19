@@ -20,34 +20,67 @@ WeiboBot 是一个基于微博H5 API开发的机器人框架，提供了一个�
 
 `pip install WeiboBot`
 
-## 开始使用
+## 开始使用(事件驱动模式)
 
 ```python
 from WeiboBot import Bot
 from WeiboBot.message import Chat
 from WeiboBot.weibo import Weibo
 from WeiboBot.comment import Comment
+
+from datetime import datetime
+
 cookies = "your cookies"
 myBot = Bot(cookies=cookies)
 
 
-@myBot.onNewMsg
-async def on_msg(oChat: Chat):
-    for msg in oChat.msg_list:  # 消息列表
+@myBot.onNewMsg  # 被私信的时候触发
+async def on_msg(chat: Chat):
+    for msg in chat.msg_list:  # 消息列表
         print(f"{msg.sender_screen_name}:{msg.text}")
 
 
-@myBot.onNewWeibo
-async def on_weibo(oWeibo: Weibo):
-    if oWeibo.original_weibo is None:  # 原创微博
-        print(f"{oWeibo.text}")
+@myBot.onNewWeibo  # 首页刷到新微博时触发
+async def on_weibo(weibo: Weibo):
+    if weibo.original_weibo is None:  # 是原创微博
+        print(f"{weibo.text}")
 
-@myBot.onMentionCmt
+
+@myBot.onMentionCmt  # 提及我的评论时触发
 async def on_mention_cmt(cmt: Comment):
-    print(f"{cmt.text}") # 被评论@了
+    print(f"{cmt.text}")
+
+
+@myBot.onTick  # 每次循环触发
+async def on_tick():
+    print(datetime.now())
+
 
 if __name__ == '__main__':
     myBot.run()
+
+```
+
+## 开始使用(主动模式)
+
+```python
+from WeiboBot import Bot
+from WeiboBot.const import *
+import asyncio
+
+cookies = "your cookies"
+myBot = Bot(cookies=cookies)
+
+
+async def main():
+    await asyncio.wait_for(myBot.login(), timeout=10)  # 先登录
+    weibo_example1 = myBot.get_weibo(123456789)  # 获取微博
+    weibo_example2 = myBot.post_action("发一条微博", visible=VISIBLE.ALL)
+    # ...... 其他操作
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
 
 ```
 

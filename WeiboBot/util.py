@@ -23,7 +23,7 @@ def main_header(cookies: bytes) -> Dict[str, str]:
     x-requested-with: XMLHttpRequest
     x-xsrf-token: 1d1b9c
             '''
-    
+
     return formatHeader(headers_raw, cookies)
 
 
@@ -42,7 +42,7 @@ sec-fetch-mode: navigate
 sec-fetch-site: same-origin
 upgrade-insecure-requests: 1
 user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.82 Safari/537.36'''
-    
+
     return formatHeader(headers_raw, cookies)
 
 
@@ -53,16 +53,16 @@ def formatHeader(headers_raw: bytes, cookies: bytes) -> Dict[str, str]:
     headers_raw = headers_raw % cookies
     headers = headers_raw.splitlines()
     headers_tuples = [header.split(b":", 1) for header in headers]
-    
+
     result_dict = {}
     for header_item in headers_tuples:
         if not len(header_item) == 2:
             continue
-        
+
         item_key: str = header_item[0].strip().decode("utf8")
         item_value: str = header_item[1].strip().decode("utf8")
         result_dict[item_key] = item_value
-    
+
     return result_dict
 
 

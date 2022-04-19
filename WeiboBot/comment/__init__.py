@@ -27,25 +27,26 @@ class Comment:
         self.cut_tail = BoolField()  # 是否截断
         self.bid = StrField()
         self.reply_original_text = StrField()  # 回复原文
-        
+        self.feedback_menu_type = IntField()  # 回复菜单类型
+
         self.logger = get_logger(__name__)
         self.root_weibo: Union[Weibo, None] = None
         self.sender: Union[User, None] = None
-    
+
     def parse(self, data):
         for k, v in data.items():
             if hasattr(self, k):
                 setattr(self, k, v)
             else:
                 self.logger.warning(f'{k} is not a valid attribute, type is {type(v)}')
-        
+
         if data["status"]:
             weibo = Weibo()
             weibo.parse(data["status"])
             self.root_weibo = weibo
         else:
             self.logger.warning(f'status is not a valid attribute')
-            
+
         if data["user"]:
             user = User()
             user.parse(data["user"])

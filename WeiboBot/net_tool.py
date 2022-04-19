@@ -80,6 +80,9 @@ class NetTool:
             self.st_times += 1
             await asyncio.sleep(0.5)
             return await self.st()
+        islogin = data["data"]["login"]
+        if islogin is False:
+            raise LoginError("登录失败!请输入cookies")
         st = data["data"]["st"]
         return st
     
@@ -140,9 +143,10 @@ class NetTool:
         params = {"page": page}
         return await self.get("https://m.weibo.cn/message/mentionsCmt", params=params)
     
-    async def refresh_page(self):
+    async def refresh_page(self, max_id: Union[str, int]):
         self.add_ref("https://m.weibo.cn/")
-        return await self.get("https://m.weibo.cn/feed/friends?")
+        params = {"max_id": max_id}
+        return await self.get("https://m.weibo.cn/feed/friends", params=params)
     
     async def like(self, mid):
         self.add_ref("https://m.weibo.cn/")
