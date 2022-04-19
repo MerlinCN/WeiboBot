@@ -107,7 +107,7 @@ class Bot(User):
         oWeibo.parse(raw_data)
         return oWeibo
 
-    async def _post(self, content: str, visible: VISIBLE = VISIBLE.ALL) -> Weibo:
+    async def post_weibo(self, content: str, visible: VISIBLE = VISIBLE.ALL) -> Weibo:
         """
         发布微博
         
@@ -129,16 +129,16 @@ class Bot(User):
             raise RequestError(f"错误类型{result['errno']},{result['msg']}")
 
     def post_action(self, content: str, visible: VISIBLE = VISIBLE.ALL):
-        self.action_list.append(Action(self._post, content, visible))
+        self.action_list.append(Action(self.post_weibo, content, visible))
 
     def repost_action(self, mid: Union[str, int], content: str = "转发微博", dualPost: bool = False):
         for action in self.action_list:
             if mid in action.args:
                 self.logger.info(f"动作序列中已存在{mid}的转发动作")
                 return
-        self.action_list.append(Action(self._repost, mid, content, dualPost))
+        self.action_list.append(Action(self.repost_weibo, mid, content, dualPost))
 
-    async def _repost(self, mid: Union[str, int], content: str = "转发微博", dualPost: bool = False) -> Weibo:
+    async def repost_weibo(self, mid: Union[str, int], content: str = "转发微博", dualPost: bool = False) -> Weibo:
         """
         转发微博
         

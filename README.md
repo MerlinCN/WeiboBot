@@ -75,7 +75,7 @@ myBot = Bot(cookies=cookies)
 async def main():
     await asyncio.wait_for(myBot.login(), timeout=10)  # 先登录
     weibo_example1 = myBot.get_weibo(123456789)  # 获取微博
-    weibo_example2 = myBot.post_action("发一条微博", visible=VISIBLE.ALL)
+    weibo_example2 = myBot.post_weibo("发一条微博", visible=VISIBLE.ALL)
     # ...... 其他操作
 
 
