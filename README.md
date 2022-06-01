@@ -84,6 +84,15 @@ if __name__ == '__main__':
 
 ```
 
+## 如何获取cookie
+
+登录m.weibo.cn
+
+按F12查看请求头
+
+![image](https://user-images.githubusercontent.com/37311477/164148500-c6a19f75-d1fd-48e6-9850-6c5380847dcd.png)
+
+
 ## 示例
 
 [好康Bot](https://github.com/MerlinCN/WeiboWatchdog)
