@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf8") as fh:
 
 setuptools.setup(
     name="WeiboBot",
-    version="0.1.5",
+    version="0.1.6",
     author="Merlin",
     author_email="merlin@merlinblog.cn",
     description="基于微博H5 API开发的机器人框架",
