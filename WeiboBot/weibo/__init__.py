@@ -106,7 +106,7 @@ class Weibo:
             if hasattr(self, k):
                 setattr(self, k, v)
             else:
-                self.logger.warning(f'{k} is not a valid attribute, type is {type(v)}, id is {self.id}')
+                self.logger.debug(f'{k} is not a valid attribute, type is {type(v)}, id is {self.id}')
         
         if self.retweeted_status != {}:
             self.original_weibo = Weibo()

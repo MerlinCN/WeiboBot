@@ -25,7 +25,7 @@ class Chat:
             if hasattr(self, k):
                 setattr(self, k, v)
             else:
-                self.logger.warning(f'{k} is not a valid attribute, type is {type(v)}')
+                self.logger.debug(f'{k} is not a valid attribute, type is {type(v)}')
         
         if data["msgs"]:
             for v in data["msgs"]:
