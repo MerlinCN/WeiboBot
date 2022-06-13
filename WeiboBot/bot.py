@@ -259,7 +259,7 @@ class Bot(User):
                 await self._scan_page(result)
                 page_cnt += 1
                 self.logger.info("第%d页获取成功" % page_cnt)
-                last_weibo_id = result["status"][-1]["id"]
+                last_weibo_id = result["statuses"][-1]["id"]
             except Exception:
                 await asyncio.sleep(3)
                 continue
