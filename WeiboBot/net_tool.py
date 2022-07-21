@@ -38,6 +38,9 @@ class NetTool:
             options = Options()
             options.add_argument("--headless")
             options.add_argument("--window-size=1920,1080")
+            options.add_argument('--disable-gpu')
+            options.add_argument('--no-sandbox')
+
             self.wd = webdriver.Chrome(options=options)
         else:
             self.wd = None
@@ -149,6 +152,14 @@ class NetTool:
         url = f"https://m.weibo.cn/detail/{mid}"
         r = self.mainSession.get(url, headers=self.header)
         screenshot = b''
+        weibo_info = {}
+        try:
+            weibo_info =  json.loads(re.findall(r'(?<=render_data = \[)[\s\S]*(?=\]\[0\])', r.text)[0])[
+                       "status"]
+        except IndexError:
+            self.logger.error(f"{url} 解析错误 \n{r.text}")
+            raise RequestError("解析微博信息错误")
+
         if self.wd is not None:
             try:
                 self.wd.get(url)
@@ -160,12 +171,7 @@ class NetTool:
                 self.logger.error(f"{url} webdriver错误 \n{e}")
                 raise RequestError("解析微博 webdriver错误")
 
-        try:
-            return json.loads(re.findall(r'(?<=render_data = \[)[\s\S]*(?=\]\[0\])', r.text)[0])[
-                       "status"], screenshot
-        except IndexError:
-            self.logger.error(f"{url} 解析错误 \n{r.text}")
-            raise RequestError("解析微博信息错误")
+        return weibo_info,screenshot
 
     async def send_chat(self, uid: Union[str, int], content: str):
         params = {
