@@ -97,24 +97,25 @@ class Weibo:
         self.comment_manage_info = DictField()
         self.attitude_dynamic_adid = StrField()
         # endregion
-        
+
         self.original_weibo: Union[Weibo, None] = None
+        self.screenshot: bytes = b''
         self.logger = get_logger(__name__)
-    
+
     def parse(self, data):
         for k, v in data.items():
             if hasattr(self, k):
                 setattr(self, k, v)
             else:
                 self.logger.debug(f'{k} is not a valid attribute, type is {type(v)}, id is {self.id}')
-        
+
         if self.retweeted_status != {}:
             self.original_weibo = Weibo()
             self.original_weibo.parse(self.retweeted_status)
-    
+
     def detail_url(self) -> str:
         return f"https://m.weibo.cn/detail/{self.id}"
-    
+
     def full_text(self) -> str:
         """
         未格式化的原文本
@@ -124,24 +125,24 @@ class Weibo:
             return self.longText['longTextContent']
         else:
             return self.text
-    
+
     def weibo_id(self) -> int:
         return int(self.id)
-    
+
     def user_uid(self) -> int:
         return int(self.user["id"])
-    
+
     def video_url(self) -> str:
         url = ""
         if self.page_info.get("type", "") == "video" and "urls" in self.page_info:
             url = list(self.page_info["urls"].values())[0]
         return url
-    
+
     def image_list(self) -> List[str]:
         return [img["large"]["url"] for img in self.pics]
-    
+
     def thumbnail_image_list(self) -> List[str]:
         return [img["url"] for img in self.pics]  # 微博图片(缩略图)
-    
+
     def is_visible(self) -> bool:
         return self.visible.get('type', 0) == 0

@@ -15,9 +15,10 @@ from .weibo import Weibo
 
 
 class Bot(User):
-    def __init__(self, userName: str = "", password: str = "", cookies: str = "", loop_interval=5, action_interval=30):
+    def __init__(self, userName: str = "", password: str = "", cookies: str = "", loop_interval=5, action_interval=30,
+                 use_selenium=False):
         super(Bot, self).__init__()
-        self.nettool = NetTool(userName, password, cookies)
+        self.nettool = NetTool(userName, password, cookies, use_selenium)
 
         self.msg_handler: List[Callable] = []
         self.weibo_handler: List[Callable] = []
@@ -102,8 +103,9 @@ class Bot(User):
         :param mid:微博id
         :return: 微博实例
         """
-        raw_data = await self.nettool.weibo_info(mid)
+        raw_data, screenshot = await self.nettool.weibo_info(mid)
         oWeibo = Weibo()
+        oWeibo.screenshot = screenshot
         oWeibo.parse(raw_data)
         return oWeibo
 
@@ -327,19 +329,22 @@ class Bot(User):
 
     async def lifecycle(self):
         await asyncio.wait_for(self.login(), timeout=10)
-        while True:
-            await asyncio.gather(
-                self.chat_event(),
-                self.weibo_event(),
-                self.mentions_cmt_event(),
-                self.tick(),
-                self.run_action(),
-            )
-            self.logger.info("Heartbeat")
-            await asyncio.sleep(self.loop_interval)
+        await asyncio.gather(
+            self.chat_event(),
+            self.weibo_event(),
+            self.mentions_cmt_event(),
+            self.tick(),
+            self.run_action(),
+        )
+        self.logger.info("Heartbeat")
+        await asyncio.sleep(self.loop_interval)
 
     def run(self):
         try:
-            asyncio.get_event_loop().run_until_complete(self.lifecycle())
+            asyncio.run(self.lifecycle())
         except KeyboardInterrupt:
-            pass
+            self.quit()
+
+    def quit(self):
+        if self.nettool.wd:
+            self.nettool.wd.quit()

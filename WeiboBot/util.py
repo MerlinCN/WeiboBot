@@ -1,8 +1,10 @@
 from typing import Dict
 
 from .log import Log
+import time
 
-__all__ = ["chat_header", "main_header", "IntField", "StrField", "BoolField", "DictField", "ListField", "get_logger"]
+__all__ = ["chat_header", "main_header", "IntField", "StrField", "BoolField", "DictField", "ListField", "get_logger",
+           "parse_cookies"]
 
 
 def main_header(cookies: bytes) -> Dict[str, str]:
@@ -88,3 +90,25 @@ def ListField() -> list:
 
 def get_logger(name: str) -> Log:
     return Log(name)
+
+
+def parse_cookies(cookies: str) -> list:
+    result = []
+    for kv in cookies.split(";"):
+        k = kv.split("=")[0].replace(" ", "")
+        v = kv.split("=")[1].replace(" ", "")
+        domain = ".weibo.cn"
+        if k == "XSRF-TOKEN":
+            domain = ".m.weibo.cn"
+
+        result.append({
+            "domain": domain,
+            "expiry": int(time.time()) + 60 * 60 * 24 * 365,
+            "name": k,
+            "path": "/",
+            "secure": False,
+            "httpOnly": False,
+            "value": v,
+        })
+
+    return result
