@@ -58,7 +58,7 @@ class Bot(User):
     def is_weibo_repost(self, mid: Union[str, int]) -> bool:
         """
         判断微博是否转发
-        
+
         :param mid: 微博id
         :return: True/False
         """
@@ -99,7 +99,7 @@ class Bot(User):
     async def get_weibo(self, mid: Union[str, int]) -> Weibo:
         """
         获取微博实例
-        
+
         :param mid:微博id
         :return: 微博实例
         """
@@ -112,23 +112,27 @@ class Bot(User):
     async def post_weibo(self, content: str, visible: VISIBLE = VISIBLE.ALL) -> Weibo:
         """
         发布微博
-        
+
         :param content:内容
         :param visible:可见性
         :return:新发出的微博
         """
         result = await self.nettool.post_weibo(content, visible)
         self.check_result(result)
-        oWeibo = Weibo()
-        oWeibo.parse(result["data"])
+        weibo = Weibo()
+        weibo.parse(result["data"])
         self.logger.info(f"发送微博成功")
-        return oWeibo
+        return weibo
 
     def check_result(self, result: dict):
         if result["ok"] == 0:
-            if result.get("errno", 0) in WEIBO_WARNING:
-                self.logger.warning(f"错误类型{result['errno']},{result['msg']}")
-            raise RequestError(f"错误类型{result['errno']},{result['msg']}")
+            err = WEIBO_ERR(result.get("errno", 0))
+            if err == WEIBO_ERR.NO_EXIST:
+                raise NoExistError(f"微博不存在或暂无查看权限")
+            else:
+                raise RequestError(f"错误类型{result['errno']},{result['msg']}")
+        elif result["ok"] == -100:
+            raise LoginError(f"Cookies已过期，请重新登录")
 
     def post_action(self, content: str, visible: VISIBLE = VISIBLE.ALL):
         self.action_list.append(Action(self.post_weibo, content, visible))
@@ -143,7 +147,7 @@ class Bot(User):
     async def repost_weibo(self, mid: Union[str, int], content: str = "转发微博", dualPost: bool = False) -> Weibo:
         """
         转发微博
-        
+
         :param mid:微博id
         :param content:内容
         :param dualPost: 是否同时评论
@@ -151,11 +155,11 @@ class Bot(User):
         """
         result = await self.nettool.repost_weibo(mid, content, dualPost)
         self.check_result(result)
-        oWeibo = Weibo()
-        oWeibo.parse(result["data"])
+        weibo = Weibo()
+        weibo.parse(result["data"])
         self.mark_weibo_repost(mid)
-        self.logger.info(f"转发微博 {oWeibo.detail_url()} 成功")
-        return oWeibo
+        self.logger.info(f"转发微博 {weibo.detail_url()} 成功")
+        return weibo
 
     async def send_chat(self, uid: Union[str, int], content: str):
         result = await self.nettool.send_chat(uid, content)
@@ -182,7 +186,7 @@ class Bot(User):
     async def mentions_cmt_event(self):
         try:
             cmt_list = await self.mentions_cmt_list()
-        except Exception as e:
+        except RequestError as e:
             self.logger.warning(f"获取@我的评论失败:{e}")
             return
         for cmt in cmt_list:
@@ -317,7 +321,7 @@ class Bot(User):
         """
         执行所有的action
         如果成功或者超过最大尝试次数，则删除action
-        
+
         :return:
         """
         for action in self.action_list:

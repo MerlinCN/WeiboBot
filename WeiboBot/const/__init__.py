@@ -1,6 +1,6 @@
 from enum import Enum
 
-__all__ = ["VISIBLE", "MSG", "ACTION", "WEIBOERR", "WEIBO_WARNING"]
+__all__ = ["VISIBLE", "MSG", "ACTION", "WEIBO_ERR"]
 
 
 class VISIBLE(Enum):
@@ -23,8 +23,10 @@ class ACTION(Enum):
     MAX_TRY = 4  # 超过最大尝试次数
 
 
-class WEIBOERR(Enum):
+class WEIBO_ERR(Enum):
+    DEFAULT = 0  # 默认
     NO_DATA = 100011  # 没有数据
+    NO_EXIST = 20101  # 微博不存在或暂无查看权限
 
 
-WEIBO_WARNING = [WEIBOERR.NO_DATA.value]
+
