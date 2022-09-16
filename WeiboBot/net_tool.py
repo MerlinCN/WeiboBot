@@ -95,11 +95,11 @@ class NetTool:
         return True, roleid
 
     def init_webdriver(self):
-
-        self.wd.get("https://m.weibo.cn/")
-        for cookie in self.cookies_dict:
-            self.wd.add_cookie(cookie)
-        self.wd.refresh()
+        if self.wd is not None:
+            self.wd.get("https://m.weibo.cn/")
+            for cookie in self.cookies_dict:
+                self.wd.add_cookie(cookie)
+            self.wd.refresh()
 
     async def st(self):
         """
