@@ -5,10 +5,6 @@ from typing import Dict, Tuple, Union
 
 import requests
 import requests.utils
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.wait import WebDriverWait
-from selenium.webdriver.common.by import By
 
 from .const import *
 from .exception import *
@@ -16,7 +12,7 @@ from .util import *
 
 
 class NetTool:
-    def __init__(self, userName: str = "", password: str = "", cookies: str = "", use_selenium=False):
+    def __init__(self, userName: str = "", password: str = "", cookies: str = ""):
         super(NetTool, self).__init__()
         # 暂不支持用户名和密码登录 v1.0
         if userName and password:
@@ -34,19 +30,6 @@ class NetTool:
 
         self.cookies_dict = parse_cookies(cookies)
 
-        if use_selenium is True:
-            options = Options()
-            options.add_argument("enable-automation")
-            options.add_argument("--headless")
-            options.add_argument("--window-size=1920,1080")
-            options.add_argument("--no-sandbox")
-            options.add_argument("--disable-extensions")
-            options.add_argument("--dns-prefetch-disable")
-            options.add_argument("--disable-gpu")
-            self.options = options
-            self.wd = webdriver.Chrome(options=options)
-        else:
-            self.wd = None
         self.st_times = 0  # 获取st的次数
         self.logger = get_logger(__name__)
 
@@ -64,10 +47,10 @@ class NetTool:
         result = r.json()
         return result
 
-    async def post(self, url: str, params: Dict = None, header=None) -> Dict:
+    async def post(self, url: str, params: Dict = None, header=None, files=None) -> Dict:
         if header is None:
             header = self.header
-        r = self.mainSession.post(url, headers=header, data=params)
+        r = self.mainSession.post(url, headers=header, data=params, files=files)
         if r.status_code != 200:
             raise RequestError(f"网络错误!状态码:{r.status_code}\n{r.text}")
         self.refresh_cookies()
@@ -91,15 +74,7 @@ class NetTool:
         st = data["data"]["st"]
         self.header["x-xsrf-token"] = st
         roleid = int(data['data']['uid'])
-        self.init_webdriver()
         return True, roleid
-
-    def init_webdriver(self):
-        if self.wd is not None:
-            self.wd.get("https://m.weibo.cn/")
-            for cookie in self.cookies_dict:
-                self.wd.add_cookie(cookie)
-            self.wd.refresh()
 
     async def st(self):
         """
@@ -151,37 +126,54 @@ class NetTool:
         }
         return await self.post("https://m.weibo.cn/api/statuses/repost", params=data)
 
-    async def weibo_info(self, mid: Union[str, int]) -> (dict, bytes):
+    async def weibo_info(self, mid: Union[str, int]) -> dict:
         url = f"https://m.weibo.cn/detail/{mid}"
         r = self.mainSession.get(url, headers=self.header)
-        screenshot = b''
         weibo_info = {}
         try:
-            weibo_info =  json.loads(re.findall(r'(?<=render_data = \[)[\s\S]*(?=\]\[0\])', r.text)[0])[
-                       "status"]
+            weibo_info = json.loads(re.findall(r'(?<=render_data = \[)[\s\S]*(?=\]\[0\])', r.text)[0])[
+                "status"]
         except IndexError:
             self.logger.error(f"{url} 解析错误 \n{r.text}")
             raise RequestError("解析微博信息错误")
 
-        if self.wd is not None:
-            try:
-                self.wd.get(url)
-                wait = WebDriverWait(self.wd, 30)
-                wait.until(lambda _: self.wd.find_elements(By.CSS_SELECTOR, '.f-weibo'))
-                weibo_frame = self.wd.find_element(By.CSS_SELECTOR, '.f-weibo')
-                screenshot = weibo_frame.screenshot_as_png
-            except Exception as e:
-                self.logger.error(f"{url} webdriver错误 \n{e}")
-                raise RequestError("解析微博 webdriver错误")
+        return weibo_info
 
-        return weibo_info,screenshot
-
-    async def send_chat(self, uid: Union[str, int], content: str):
+    async def upload_chat_file(self, tuid, file_path):
+        files = {
+            "file": (file_path, open(file_path, 'rb'), 'image/jpeg')
+        }
         params = {
+            "tuid": tuid,
+            "st": await self.st(),
+            "_spr": "screen:2560x1440"
+        }
+        result = await self.post("https://m.weibo.cn/api/chat/upload", params=params, files=files)
+        if result['ok'] != 1:
+            raise UploadError(f"上传文件错误 {result}")
+
+        return result['data']['fids']
+
+    async def send_message(self, uid: Union[str, int], content: str, file_path: str):
+
+        media_type = MEDIA.NONE.value
+        fids = 0
+        if file_path:
+            media_type = MEDIA.PHOTO.value
+            content = ""
+            try:
+                fids = await self.upload_chat_file(tuid=int(uid), file_path=file_path)
+            except RequestError as e:
+                self.logger.error(f"文件上传失败 {e}")
+                return {}
+
+        params = {
+            "media_type": media_type,
             "uid": int(uid),
             "content": content,
             "st": await self.st(),
-            "_spr": "screen:2560x1440"
+            "_spr": "screen:2560x1440",
+            "fids": fids,
         }
         return await self.post("https://m.weibo.cn/api/chat/send", params=params)
 
@@ -211,3 +203,17 @@ class NetTool:
             "_spr": "screen:2560x1440"
         }
         return await self.post("https://m.weibo.cn/api/attitudes/create", params=params)
+
+    async def del_weibo(self, mid):
+        params = {
+            "mid": mid,
+            "st": await self.st(),
+            "_spr": "screen:2560x1440"
+        }
+        return await self.post("https://m.weibo.cn/profile/delMyblog", params=params)
+
+    async def get_user(self, uid):
+        params = {
+            "uid": uid
+        }
+        return await self.get(f"https://m.weibo.cn/profile/info", params=params)

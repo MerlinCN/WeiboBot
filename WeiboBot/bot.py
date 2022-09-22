@@ -16,9 +16,9 @@ from .weibo import Weibo
 
 class Bot(User):
     def __init__(self, userName: str = "", password: str = "", cookies: str = "", loop_interval=5, action_interval=30,
-                 use_selenium=False):
+                 ):
         super(Bot, self).__init__()
-        self.nettool = NetTool(userName, password, cookies, use_selenium)
+        self.nettool = NetTool(userName, password, cookies)
 
         self.msg_handler: List[Callable] = []
         self.weibo_handler: List[Callable] = []
@@ -161,12 +161,20 @@ class Bot(User):
         self.logger.info(f"转发微博 {weibo.detail_url()} 成功")
         return weibo
 
-    async def send_chat(self, uid: Union[str, int], content: str):
-        result = await self.nettool.send_chat(uid, content)
+    async def send_message(self, uid: Union[str, int], content: str = "", file_path: str = ""):
+        """
+        私信并返回聊天对象
+
+        :param uid:角色id
+        :param content:文本内容
+        :param file_path:附件
+        :return: 聊天对象
+        """
+        result = await self.nettool.send_message(uid, content, file_path)
         self.check_result(result)
-        oChat = Chat()
-        oChat.parse(result["data"])
-        return oChat
+        chat = Chat()
+        chat.parse(result["data"])
+        return chat
 
     async def chat_list(self, page: int = 1):
         result = await self.nettool.chat_list(page)
@@ -229,10 +237,10 @@ class Bot(User):
         return result["data"]
 
     async def solve_weibo(self, mid: Union[str, int]):
-        oWeibo = await self.get_weibo(mid)
+        weibo = await self.get_weibo(mid)
         for func in self.weibo_handler:
             try:
-                await func(oWeibo)
+                await func(weibo)
             except Exception as e:
                 self.logger.error(f"处理微博失败:{e}")
                 continue
@@ -285,10 +293,45 @@ class Bot(User):
         oChat.parse(result["data"])
         return oChat
 
-    async def like_weibo(self, mid):
+    async def like_weibo(self, mid) -> dict:
+        """
+        点赞某条微博
+
+        :param mid: 微博id
+        :return:返回的json字典
+        """
         result = await self.nettool.like(mid)
         self.check_result(result)
         return result["data"]
+
+    async def del_weibo(self, mid) -> int:
+        """
+        删除自己某条微博
+
+        :param mid: 微博id
+        :return:返回的json字典
+        """
+        result = await self.nettool.del_weibo(mid)
+        return result["ok"]
+
+    async def get_user(self, uid) -> User:
+        """
+        获取微博用户对象
+
+        :param uid: 用户id
+        :return: 用户对象
+        """
+        result = await self.nettool.get_user(uid)
+        self.check_result(result)
+        user = User()
+        user.parse(result["data"]["user"])
+
+        for status in result["data"]["statuses"]:
+            weibo = Weibo()
+            weibo.parse(status)
+            user.latest_weibo.append(weibo)
+
+        return user
 
     # region 事件装饰器
     def onNewMsg(self, func):
@@ -348,8 +391,4 @@ class Bot(User):
         try:
             asyncio.run(self.lifecycle())
         except KeyboardInterrupt:
-            self.quit()
-
-    def quit(self):
-        if self.nettool.wd:
-            self.nettool.wd.quit()
+            pass

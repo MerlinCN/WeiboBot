@@ -1,10 +1,10 @@
 from typing import Dict
-
+from WeiboBot.weibo import Weibo
 from WeiboBot.util import *
 
 
 class User:
-    
+
     def __init__(self):
         self.id = IntField()  # 用户id
         self.screen_name = StrField()  # 用户昵称
@@ -31,9 +31,10 @@ class User:
         self.badge = DictField()  # 徽章
         self.verified_type_ext = IntField()  # 认证类型扩展
         self.verified_reason = StrField()  # 认证原因
-        
+
+        self.latest_weibo: list[Weibo] = []
         self.logger = get_logger(__name__)
-    
+
     def parse(self, info: Dict):
         for k, v in info.items():
             if hasattr(self, k):

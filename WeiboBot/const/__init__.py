@@ -1,6 +1,6 @@
 from enum import Enum
 
-__all__ = ["VISIBLE", "MSG", "ACTION", "WEIBO_ERR"]
+__all__ = ["VISIBLE", "MSG", "ACTION", "WEIBO_ERR","MEDIA"]
 
 
 class VISIBLE(Enum):
@@ -29,4 +29,6 @@ class WEIBO_ERR(Enum):
     NO_EXIST = 20101  # 微博不存在或暂无查看权限
 
 
-
+class MEDIA(Enum):
+    NONE = 0
+    PHOTO = 1

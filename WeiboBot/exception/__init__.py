@@ -1,4 +1,4 @@
-__all__ = ["LoginError", "RequestError", "NoExistError"]
+__all__ = ["LoginError", "RequestError", "NoExistError", "UploadError"]
 
 
 class LoginError(Exception):
@@ -10,4 +10,8 @@ class NoExistError(Exception):
 
 
 class RequestError(Exception):
+    pass
+
+
+class UploadError(Exception):
     pass
