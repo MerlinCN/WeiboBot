@@ -227,7 +227,7 @@ class Bot(User):
         self.check_result(result)
         return result["data"]
 
-    async def mentions_cmt_list(self, page: int = 1) -> list[Comment]:
+    async def mentions_cmt_list(self, page: int = 1) -> List[Comment]:
         result = await self.nettool.mentions_cmt(page)
         try:
             self.check_result(result)
