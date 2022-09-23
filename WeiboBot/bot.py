@@ -86,6 +86,8 @@ class Bot(User):
 
         await self.init_bot_info()
 
+        return True
+
     async def init_bot_info(self):
         raw_data = await self.nettool.user_info(self.id)
         if raw_data["ok"] == 0:
@@ -115,7 +117,7 @@ class Bot(User):
         weibo.parse(raw_data)
         return weibo
 
-    async def post_weibo(self, content: str, visible: VISIBLE = VISIBLE.ALL) -> Weibo:
+    async def post_weibo(self, content: str, visible: VISIBLE = VISIBLE.ALL) -> Union[Weibo, None]:
         """
         发布微博
 
@@ -124,10 +126,14 @@ class Bot(User):
         :return:新发出的微博
         """
         result = await self.nettool.post_weibo(content, visible)
-        self.check_result(result)
+        try:
+            self.check_result(result)
+        except Exception as e:
+            self.logger.error(f"发送微博错误 {content} {result} {e}")
+            return None
         weibo = Weibo()
         weibo.parse(result["data"])
-        self.logger.info(f"发送微博成功")
+        self.logger.info(f"发送微博成功 {weibo.detail_url()}")
         return weibo
 
     def check_result(self, result: dict):
@@ -139,6 +145,7 @@ class Bot(User):
                 raise RequestError(f"错误类型{result['errno']},{result['msg']}")
         elif result["ok"] == -100:
             raise LoginError(f"Cookies已过期，请重新登录")
+        return True
 
     def post_action(self, content: str, visible: VISIBLE = VISIBLE.ALL):
         self.action_list.append(Action(self.post_weibo, content, visible))
@@ -150,7 +157,8 @@ class Bot(User):
                 return
         self.action_list.append(Action(self.repost_weibo, mid, content, dualPost))
 
-    async def repost_weibo(self, mid: Union[str, int], content: str = "转发微博", dualPost: bool = False) -> Weibo:
+    async def repost_weibo(self, mid: Union[str, int], content: str = "转发微博", dualPost: bool = False) -> Union[
+        Weibo, None]:
         """
         转发微博
 
@@ -160,7 +168,11 @@ class Bot(User):
         :return:新发出的微博
         """
         result = await self.nettool.repost_weibo(mid, content, dualPost)
-        self.check_result(result)
+        try:
+            self.check_result(result)
+        except Exception as e:
+            self.logger.error(f"转发微博错误 {mid} {result} {e}")
+            return None
         weibo = Weibo()
         weibo.parse(result["data"])
         self.mark_weibo_repost(mid)
@@ -177,21 +189,51 @@ class Bot(User):
         :return: 聊天对象
         """
         result = await self.nettool.send_message(uid, content, file_path)
-        if result == {}:
+        try:
+            self.check_result(result)
+        except Exception as e:
+            self.logger.error(f"私信错误 {uid} {result} {e}")
             return None
-        self.check_result(result)
         chat = Chat()
         chat.parse(result["data"])
+        self.logger.info(f"私信成功")
         return chat
+
+    async def comment_weibo(self, mid: Union[str, int], content: str = "", file_path: str = "") -> Union[Comment, None]:
+        result = await self.nettool.comment_weibo(mid, content, file_path)
+        try:
+            self.check_result(result)
+        except Exception as e:
+            self.logger.error(f"评论错误 {mid} {result} {e}")
+            return None
+        cmt = Comment()
+        cmt.parse(result["data"])
+        self.logger.info(f"评论成功 {cmt.root_weibo.detail_url()}#{cmt.id}")
+        return cmt
+
+    async def del_comment(self, cid) -> int:
+        """
+        删除某条评论
+
+        :param cid: 评论id
+        :return:返回的json字典
+        """
+        result = await self.nettool.del_comment(cid)
+        self.logger.info(f"删除评论 {cid} 成功")
+        return result["ok"]
 
     async def chat_list(self, page: int = 1):
         result = await self.nettool.chat_list(page)
         self.check_result(result)
         return result["data"]
 
-    async def mentions_cmt_list(self, page: int = 1):
+    async def mentions_cmt_list(self, page: int = 1) -> list[Comment]:
         result = await self.nettool.mentions_cmt(page)
-        self.check_result(result)
+        try:
+            self.check_result(result)
+        except Exception as e:
+            self.logger.error(f"获取@我的评论 错误 {page} {result} {e}")
+            return []
         result_list = []
         for dCmt in result["data"]:
             cmt = Comment()
@@ -241,7 +283,11 @@ class Bot(User):
 
     async def refresh_page(self, max_id=0):
         result = await self.nettool.refresh_page(max_id)
-        self.check_result(result)
+        try:
+            self.check_result(result)
+        except Exception as e:
+            self.logger.error(f"获取主页错误 {max_id} {result} {e}")
+            return {}
         return result["data"]
 
     async def solve_weibo(self, mid: Union[str, int]):
@@ -283,7 +329,7 @@ class Bot(User):
                 page_cnt += 1
                 self.logger.info("第%d页获取成功" % page_cnt)
                 last_weibo_id = result["statuses"][-1]["id"]
-            except Exception:
+            except Exception as e:
                 await asyncio.sleep(1)
                 continue
 
@@ -295,12 +341,16 @@ class Bot(User):
             return
         await self._scan_page(result)
 
-    async def user_chat(self, uid: Union[str, int], since_id: int = 0):
+    async def user_chat(self, uid: Union[str, int], since_id: int = 0) -> Union[Chat, None]:
         result = await self.nettool.user_chat(uid, since_id)
-        self.check_result(result)
-        oChat = Chat()
-        oChat.parse(result["data"])
-        return oChat
+        try:
+            self.check_result(result)
+        except Exception as e:
+            self.logger.error(f"获取聊天记录错误 {uid} {result} {e}")
+            return
+        chat = Chat()
+        chat.parse(result["data"])
+        return chat
 
     async def like_weibo(self, mid) -> dict:
         """
@@ -310,7 +360,12 @@ class Bot(User):
         :return:返回的json字典
         """
         result = await self.nettool.like(mid)
-        self.check_result(result)
+        try:
+            self.check_result(result)
+        except Exception as e:
+            self.logger.error(f"点赞错误 {mid} {result} {e}")
+            return {}
+        self.logger.info(f"点赞微博 {mid} 成功")
         return result["data"]
 
     async def del_weibo(self, mid) -> int:
@@ -321,9 +376,10 @@ class Bot(User):
         :return:返回的json字典
         """
         result = await self.nettool.del_weibo(mid)
+        self.logger.info(f"删除微博 {mid} 成功")
         return result["ok"]
 
-    async def get_user(self, uid) -> User:
+    async def get_user(self, uid) -> Union[User, None]:
         """
         获取微博用户对象
 
@@ -331,7 +387,11 @@ class Bot(User):
         :return: 用户对象
         """
         result = await self.nettool.get_user(uid)
-        self.check_result(result)
+        try:
+            self.check_result(result)
+        except Exception as e:
+            self.logger.error(f"获取用户错误 {uid} {result} {e}")
+            return
         user = User()
         user.parse(result["data"]["user"])
 
@@ -399,4 +459,4 @@ class Bot(User):
         try:
             asyncio.run(self.lifecycle())
         except KeyboardInterrupt:
-            pass
+            self.db.close()

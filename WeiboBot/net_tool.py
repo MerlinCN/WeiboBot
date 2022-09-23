@@ -214,3 +214,45 @@ class NetTool:
             "uid": uid
         }
         return await self.get(f"https://m.weibo.cn/profile/info", params=params)
+
+    async def upload_comment_file(self, file_path):
+        files = {
+            "pic": (file_path, open(file_path, 'rb'), 'image/jpeg')
+        }
+        params = {
+            "type": "json",
+            "st": await self.st(),
+            "_spr": "screen:2560x1440"
+        }
+        result = await self.post("https://m.weibo.cn/api/statuses/uploadPic", params=params, files=files)
+        if not result:
+            raise UploadError(f"上传文件错误 {result}")
+
+        return result["pic_id"]
+
+    async def comment_weibo(self, mid, content, file_path=""):
+        params = {
+            "id": mid,
+            "mid": mid,
+            "content": content,
+            "st": await self.st(),
+            "_spr": "screen:2560x1440"
+        }
+
+        if file_path:
+            try:
+                pic_ids = await self.upload_comment_file(file_path=file_path)
+            except RequestError as e:
+                self.logger.error(f"文件上传失败 {e}")
+                return {}
+            params["picId"] = pic_ids
+        return await self.post(f"https://m.weibo.cn/api/comments/create", params=params)
+
+    async def del_comment(self, cid):
+        params = {
+            "cid": cid,
+            "st": await self.st(),
+            "_spr": "screen:2560x1440"
+        }
+
+        return await self.post(f"https://m.weibo.cn/comments/destroy", params=params)
