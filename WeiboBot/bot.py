@@ -1,5 +1,7 @@
 import asyncio
+import time
 from typing import Union, List, Callable
+from types import FunctionType
 
 from tinydb import TinyDB, Query
 
@@ -15,22 +17,23 @@ from .weibo import Weibo
 
 
 class Bot(User):
-    def __init__(self, userName: str = "", password: str = "", cookies: str = "", loop_interval=5, action_interval=30,
+    def __init__(self, username: str = "", password: str = "", cookies: str = "", loop_interval=1, action_interval=1,
+                 is_debug=False
                  ):
         super(Bot, self).__init__()
-        self.nettool = NetTool(userName, password, cookies)
+        self.nettool = NetTool(username, password, cookies)
 
-        self.msg_handler: List[Callable] = []
-        self.weibo_handler: List[Callable] = []
-        self.mention_cmt_handler: List[Callable] = []
-        self.tick_handler: List[Callable] = []
+        self.msg_handler: List[FunctionType] = []
+        self.weibo_handler: List[FunctionType] = []
+        self.mention_cmt_handler: List[FunctionType] = []
+        self.tick_handler: List[FunctionType] = []
         self.weibo_read = set()
-
+        self.is_debug = is_debug
         self.action_list: list[Action] = []  # 待执行的动作列表
         self.action_interval = action_interval
-        self.logger = get_logger(__name__)
+        self.logger = get_logger(__name__, is_debug)
         self.loop_interval = loop_interval
-        self.db = TinyDB('db.json')
+        self.db = TinyDB('WeiboBotDB.json')
 
     # region 数据库操作
     def is_weibo_read(self, mid: Union[str, int]) -> bool:
@@ -96,18 +99,21 @@ class Bot(User):
         self.logger.info(f"微博头像:{self.profile_image_url}")
         self.logger.info(f"微博背景图:{self.cover_image_phone}")
 
-    async def get_weibo(self, mid: Union[str, int]) -> Weibo:
+    async def get_weibo(self, mid: Union[str, int]) -> Union[Weibo, None]:
         """
         获取微博实例
 
         :param mid:微博id
         :return: 微博实例
         """
-        raw_data, screenshot = await self.nettool.weibo_info(mid)
-        oWeibo = Weibo()
-        oWeibo.screenshot = screenshot
-        oWeibo.parse(raw_data)
-        return oWeibo
+        try:
+            raw_data = await self.nettool.weibo_info(mid)
+        except RequestError:
+            self.logger.error(f"获取微博 {mid} 失败")
+            return None
+        weibo = Weibo()
+        weibo.parse(raw_data)
+        return weibo
 
     async def post_weibo(self, content: str, visible: VISIBLE = VISIBLE.ALL) -> Weibo:
         """
@@ -161,7 +167,7 @@ class Bot(User):
         self.logger.info(f"转发微博 {weibo.detail_url()} 成功")
         return weibo
 
-    async def send_message(self, uid: Union[str, int], content: str = "", file_path: str = ""):
+    async def send_message(self, uid: Union[str, int], content: str = "", file_path: str = "") -> Union[Chat, None]:
         """
         私信并返回聊天对象
 
@@ -171,6 +177,8 @@ class Bot(User):
         :return: 聊天对象
         """
         result = await self.nettool.send_message(uid, content, file_path)
+        if result == {}:
+            return None
         self.check_result(result)
         chat = Chat()
         chat.parse(result["data"])
@@ -204,7 +212,7 @@ class Bot(User):
                 try:
                     await func(cmt)
                 except Exception as e:
-                    self.logger.error(f"处理@我的评论失败:{e}")
+                    self.logger.error(f"处理@我的评论回调 {func.__name__} 失败:{e}")
                     continue
             self.mark_mention_cmt(cmt.mid)
 
@@ -228,7 +236,7 @@ class Bot(User):
                     try:
                         await func(oChat)
                     except Exception as e:
-                        self.logger.error(f"处理聊天失败:{e}")
+                        self.logger.error(f"处理聊天回调 {func.__name__} 失败:{e}")
                         continue
 
     async def refresh_page(self, max_id=0):
@@ -242,11 +250,12 @@ class Bot(User):
             try:
                 await func(weibo)
             except Exception as e:
-                self.logger.error(f"处理微博失败:{e}")
+                self.logger.error(f"处理微博回调 {func.__name__} 失败:{e}")
                 continue
 
     async def _scan_page(self, result: dict):
         for weibo in result["statuses"]:
+            await self.chat_event()
             if self.is_weibo_read(weibo["id"]):
                 continue
             try:
@@ -275,7 +284,7 @@ class Bot(User):
                 self.logger.info("第%d页获取成功" % page_cnt)
                 last_weibo_id = result["statuses"][-1]["id"]
             except Exception:
-                await asyncio.sleep(3)
+                await asyncio.sleep(1)
                 continue
 
     async def weibo_event(self):
@@ -334,19 +343,19 @@ class Bot(User):
         return user
 
     # region 事件装饰器
-    def onNewMsg(self, func):
+    def onNewMsg(self, func: FunctionType):
         if func not in self.msg_handler:
             self.msg_handler.append(func)
 
-    def onNewWeibo(self, func):
+    def onNewWeibo(self, func: FunctionType):
         if func not in self.weibo_handler:
             self.weibo_handler.append(func)
 
-    def onMentionCmt(self, func):
+    def onMentionCmt(self, func: FunctionType):
         if func not in self.mention_cmt_handler:
             self.mention_cmt_handler.append(func)
 
-    def onTick(self, func):
+    def onTick(self, func: FunctionType):
         if func not in self.tick_handler:
             self.tick_handler.append(func)
 
@@ -385,7 +394,6 @@ class Bot(User):
                 self.run_action(),
             )
             self.logger.info("Heartbeat")
-            await asyncio.sleep(self.loop_interval)
 
     def run(self):
         try:

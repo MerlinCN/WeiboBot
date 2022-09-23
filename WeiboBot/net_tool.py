@@ -12,10 +12,10 @@ from .util import *
 
 
 class NetTool:
-    def __init__(self, userName: str = "", password: str = "", cookies: str = ""):
+    def __init__(self, username: str = "", password: str = "", cookies: str = ""):
         super(NetTool, self).__init__()
         # 暂不支持用户名和密码登录 v1.0
-        if userName and password:
+        if username and password:
             raise NotImplementedError("暂不支持用户名和密码登录")
         elif cookies:
             # 如果有cookies则直接使用cookies登录
@@ -26,7 +26,6 @@ class NetTool:
         self.cookies: str = cookies
         self.header: Dict[str, str] = main_header(bytes(self.cookies, encoding="utf-8"))
         self.mainSession: requests.session = requests.session()
-        self.chat_header = chat_header(bytes(self.cookies, encoding="utf-8"))
 
         self.cookies_dict = parse_cookies(cookies)
 
@@ -90,7 +89,6 @@ class NetTool:
                 st = self.header["x-xsrf-token"]
                 return st
             self.st_times += 1
-            await asyncio.sleep(0.5)
             return await self.st()
         islogin = data["data"]["login"]
         if islogin is False:
@@ -156,25 +154,24 @@ class NetTool:
 
     async def send_message(self, uid: Union[str, int], content: str, file_path: str):
 
-        media_type = MEDIA.NONE.value
-        fids = 0
+        params = {
+            "uid": int(uid),
+            "content": content,
+            "st": await self.st(),
+            "_spr": "screen:2560x1440",
+        }
+
         if file_path:
             media_type = MEDIA.PHOTO.value
-            content = ""
             try:
                 fids = await self.upload_chat_file(tuid=int(uid), file_path=file_path)
             except RequestError as e:
                 self.logger.error(f"文件上传失败 {e}")
                 return {}
+            params["media_type"] = media_type
+            params["content"] = ""
+            params["fids"] = fids
 
-        params = {
-            "media_type": media_type,
-            "uid": int(uid),
-            "content": content,
-            "st": await self.st(),
-            "_spr": "screen:2560x1440",
-            "fids": fids,
-        }
         return await self.post("https://m.weibo.cn/api/chat/send", params=params)
 
     async def user_chat(self, uid: Union[str, int], since_id: int):

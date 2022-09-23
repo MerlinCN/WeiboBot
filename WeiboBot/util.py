@@ -3,7 +3,7 @@ from typing import Dict
 from .log import Log
 import time
 
-__all__ = ["chat_header", "main_header", "IntField", "StrField", "BoolField", "DictField", "ListField", "get_logger",
+__all__ = ["main_header", "IntField", "StrField", "BoolField", "DictField", "ListField", "get_logger",
            "parse_cookies"]
 
 
@@ -25,25 +25,6 @@ def main_header(cookies: bytes) -> Dict[str, str]:
     x-requested-with: XMLHttpRequest
     x-xsrf-token: 1d1b9c
             '''
-
-    return formatHeader(headers_raw, cookies)
-
-
-def chat_header(cookies: bytes) -> Dict[str, str]:
-    headers_raw = b'''accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9
-accept-encoding: gzip, deflate, br
-accept-language: zh-CN,zh;q=0.9
-cache-control: no-cache
-cookie: %s
-pragma: no-cache
-sec-ch-ua: " Not A;Brand";v="99", "Chromium";v="99", "Google Chrome";v="99"
-sec-ch-ua-mobile: ?0
-sec-ch-ua-platform: "Windows"
-sec-fetch-dest: empty
-sec-fetch-mode: navigate
-sec-fetch-site: same-origin
-upgrade-insecure-requests: 1
-user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.82 Safari/537.36'''
 
     return formatHeader(headers_raw, cookies)
 
@@ -88,8 +69,8 @@ def ListField() -> list:
     return []
 
 
-def get_logger(name: str) -> Log:
-    return Log(name)
+def get_logger(name: str, is_debug=True) -> Log:
+    return Log(name, is_debug=is_debug)
 
 
 def parse_cookies(cookies: str) -> list:

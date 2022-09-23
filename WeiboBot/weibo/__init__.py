@@ -99,7 +99,6 @@ class Weibo:
         # endregion
 
         self.original_weibo: Union[Weibo, None] = None
-        self.screenshot: bytes = b''
         self.logger = get_logger(__name__)
 
     def parse(self, data):
