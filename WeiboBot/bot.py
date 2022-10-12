@@ -141,6 +141,8 @@ class Bot(User):
             err = WEIBO_ERR(result.get("errno", 0))
             if err == WEIBO_ERR.NO_EXIST:
                 raise NoExistError(f"微博不存在或暂无查看权限")
+            elif err == WEIBO_ERR.NO_CONTENT:
+                return True
             else:
                 raise RequestError(f"错误类型{result['errno']},{result['msg']}")
         elif result["ok"] == -100:
@@ -334,10 +336,8 @@ class Bot(User):
                 continue
 
     async def weibo_event(self):
-        try:
-            result = await self.refresh_page()
-        except Exception as e:  # 刷新页面失败,可跳过此次刷新
-            self.logger.warning(e)
+        result = await self.refresh_page()
+        if not result:
             return
         await self._scan_page(result)
 
