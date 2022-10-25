@@ -138,7 +138,10 @@ class Bot(User):
 
     def check_result(self, result: dict):
         if result["ok"] == 0:
-            err = WEIBO_ERR(result.get("errno", 0))
+            try:
+                err = WEIBO_ERR(result.get("errno", 0))
+            except ValueError as e:
+                err = 0
             if err == WEIBO_ERR.NO_EXIST:
                 raise NoExistError(f"微博不存在或暂无查看权限")
             elif err == WEIBO_ERR.NO_CONTENT:
