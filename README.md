@@ -98,3 +98,4 @@ if __name__ == '__main__':
 [好康Bot](https://github.com/MerlinCN/WeiboWatchdog)
 
 > 一个转发小姐姐的Bot
+
