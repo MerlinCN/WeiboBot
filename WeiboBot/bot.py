@@ -229,6 +229,8 @@ class Bot(User):
 
     async def chat_list(self, page: int = 1):
         result = await self.nettool.chat_list(page)
+        if not result:
+            return []
         self.check_result(result)
         return result["data"]
 
@@ -240,6 +242,8 @@ class Bot(User):
             self.logger.error(f"获取@我的评论 错误 {page} {result} {e}")
             return []
         result_list = []
+        if not result_list:
+            return result_list
         for dCmt in result["data"]:
             cmt = Comment()
             cmt.parse(dCmt)
