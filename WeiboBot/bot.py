@@ -291,11 +291,11 @@ class Bot(User):
                         continue
 
     async def refresh_page(self, max_id=0):
-        result = await self.nettool.refresh_page(max_id)
         try:
+            result = await self.nettool.refresh_page(max_id)
             self.check_result(result)
         except Exception as e:
-            self.logger.error(f"获取主页错误 {max_id} {result} {e}")
+            self.logger.error(f"获取主页错误 {max_id} {e}")
             return {}
         return result["data"]
 
