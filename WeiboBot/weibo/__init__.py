@@ -97,16 +97,22 @@ class Weibo:
         self.comment_manage_info = DictField()
         self.attitude_dynamic_adid = StrField()
         # endregion
-
+        from WeiboBot.user import User
         self.original_weibo: Union[Weibo, None] = None
+        self.user_c: Union[User, None] = None
         self.logger = get_logger(__name__)
+        self.is_read = False
 
     def parse(self, data):
+
         for k, v in data.items():
             if hasattr(self, k):
                 setattr(self, k, v)
             else:
                 self.logger.debug(f'{k} is not a valid attribute, type is {type(v)}, id is {self.id}')
+        from WeiboBot.user import User
+        self.user_c = User()
+        self.user_c.parse(self.user)
 
         if self.retweeted_status != {}:
             self.original_weibo = Weibo()

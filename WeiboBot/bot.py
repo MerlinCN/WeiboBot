@@ -115,6 +115,10 @@ class Bot(User):
             return None
         weibo = Weibo()
         weibo.parse(raw_data)
+
+        if weibo.original_weibo and self.is_weibo_read(weibo.original_weibo.mid):
+            weibo.original_weibo.is_read = True
+
         return weibo
 
     async def post_weibo(self, content: str, visible: VISIBLE = VISIBLE.ALL) -> Union[Weibo, None]:
