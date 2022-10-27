@@ -282,6 +282,9 @@ class Bot(User):
                 except Exception as e:
                     self.logger.warning(f"获取聊天失败:{e}")
                     continue
+                if oChat is None:
+                    self.logger.warning(f"获取聊天失败:{dChat}")
+                    continue
                 oChat.msg_list = [oMsg for oMsg in oChat.msg_list[:unread] if oMsg.isDm()]
                 for func in self.msg_handler:
                     try:
