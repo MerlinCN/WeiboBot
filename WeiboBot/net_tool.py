@@ -35,24 +35,30 @@ class NetTool:
         self.header["referer"] = value
         return self.header
 
-    async def get(self, url: str, params: Dict = None, header=None) -> Dict:
+    async def get(self, url: str, params: Dict = None, header=None, types="json") -> Dict:
         if header is None:
             header = self.header
         async with self.session.get(url, headers=header, params=params) as r:
             if r.status != 200:
                 raise RequestError(f"网络错误!状态码:{r.status}\n{await r.text()}")
             self.refresh_cookies()
-            result = await r.json()
+            if types == "json":
+                result = await r.json()
+            else:
+                result = await r.text()
             return result
 
-    async def post(self, url: str, params: Dict = None, header=None) -> Dict:
+    async def post(self, url: str, params: Dict = None, header=None, types="json") -> Dict:
         if header is None:
             header = self.header
         async with self.session.post(url, headers=header, data=params) as r:
             if r.status != 200:
                 raise RequestError(f"网络错误!状态码:{r.status}\n{await r.text()}")
             self.refresh_cookies()
-            result = await r.json()
+            if types == "json":
+                result = await r.json()
+            else:
+                result = await r.text()
             return result
 
     def refresh_cookies(self):
@@ -125,10 +131,10 @@ class NetTool:
 
     async def weibo_info(self, mid: Union[str, int]) -> dict:
         url = f"https://m.weibo.cn/detail/{mid}"
-        r = self.session.get(url, headers=self.header)
+        r = await self.get(url, types="text")
         weibo_info = {}
         try:
-            weibo_info = json.loads(re.findall(r'(?<=render_data = \[)[\s\S]*(?=\]\[0\])', r.text)[0])[
+            weibo_info = json.loads(re.findall(r'(?<=render_data = \[)[\s\S]*(?=\]\[0\])', r)[0])[
                 "status"]
         except IndexError:
             self.logger.error(f"{url} 解析错误 \n{r.text}")

@@ -473,7 +473,10 @@ class Bot(User):
             self.logger.info("Heartbeat")
 
     def run(self):
+        loop = asyncio.get_event_loop()
         try:
-            asyncio.run(self.lifecycle())
+            loop.run_until_complete(self.lifecycle())
         except KeyboardInterrupt:
+            loop.run_until_complete(self.nettool.close())
             self.db.close()
+            loop.close()
