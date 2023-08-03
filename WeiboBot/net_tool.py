@@ -45,7 +45,7 @@ class NetTool:
             result = await r.json()
             return result
 
-    async def post(self, url: str, params: Dict = None, header=None, files=None) -> Dict:
+    async def post(self, url: str, params: Dict = None, header=None) -> Dict:
         if header is None:
             header = self.header
         async with self.session.post(url, headers=header, data=params) as r:
