@@ -5,10 +5,10 @@ from typing import Dict, Tuple, Union
 
 import requests
 import requests.utils
-
-from .const import *
-from .exception import *
-from .util import *
+import aiohttp
+from WeiboBot.const import *
+from WeiboBot.exception import *
+from WeiboBot.util import *
 
 
 class NetTool:
@@ -25,8 +25,7 @@ class NetTool:
 
         self.cookies: str = cookies
         self.header: Dict[str, str] = main_header(bytes(self.cookies, encoding="utf-8"))
-        self.mainSession: requests.session = requests.session()
-
+        self.session: aiohttp.ClientSession = aiohttp.ClientSession()
         self.cookies_dict = parse_cookies(cookies)
 
         self.st_times = 0  # 获取st的次数
@@ -39,25 +38,25 @@ class NetTool:
     async def get(self, url: str, params: Dict = None, header=None) -> Dict:
         if header is None:
             header = self.header
-        r = self.mainSession.get(url, headers=header, params=params)
-        if r.status_code != 200:
-            raise RequestError(f"网络错误!状态码:{r.status_code}\n{r.text}")
-        self.refresh_cookies()
-        result = r.json()
-        return result
+        async with self.session.get(url, headers=header, params=params) as r:
+            if r.status != 200:
+                raise RequestError(f"网络错误!状态码:{r.status}\n{await r.text()}")
+            self.refresh_cookies()
+            result = await r.json()
+            return result
 
     async def post(self, url: str, params: Dict = None, header=None, files=None) -> Dict:
         if header is None:
             header = self.header
-        r = self.mainSession.post(url, headers=header, data=params, files=files)
-        if r.status_code != 200:
-            raise RequestError(f"网络错误!状态码:{r.status_code}\n{r.text}")
-        self.refresh_cookies()
-        result = r.json()
-        return result
+        async with self.session.post(url, headers=header, data=params) as r:
+            if r.status != 200:
+                raise RequestError(f"网络错误!状态码:{r.status}\n{await r.text()}")
+            self.refresh_cookies()
+            result = await r.json()
+            return result
 
     def refresh_cookies(self):
-        cookies: dict = requests.utils.dict_from_cookiejar(self.mainSession.cookies)
+        cookies: dict = self.session.cookie_jar.filter_cookies("https://m.weibo.cn")
         for k, v in cookies.items():
             for c in self.cookies_dict:
                 if c["name"] == k:
@@ -126,7 +125,7 @@ class NetTool:
 
     async def weibo_info(self, mid: Union[str, int]) -> dict:
         url = f"https://m.weibo.cn/detail/{mid}"
-        r = self.mainSession.get(url, headers=self.header)
+        r = self.session.get(url, headers=self.header)
         weibo_info = {}
         try:
             weibo_info = json.loads(re.findall(r'(?<=render_data = \[)[\s\S]*(?=\]\[0\])', r.text)[0])[
@@ -141,16 +140,31 @@ class NetTool:
         files = {
             "file": (file_path, open(file_path, 'rb'), 'image/jpeg')
         }
-        params = {
+        data = {
             "tuid": tuid,
             "st": await self.st(),
             "_spr": "screen:2560x1440"
         }
-        result = await self.post("https://m.weibo.cn/api/chat/upload", params=params, files=files)
-        if result['ok'] != 1:
-            raise UploadError(f"上传文件错误 {result}")
-
+        r = requests.post("https://m.weibo.cn/api/chat/upload", headers=self.header, data=data, files=files)
+        if r.status_code != 200:
+            raise UploadError(f"上传文件错误 {r.text}")
+        result = r.json()
         return result['data']['fids']
+
+    async def upload_comment_file(self, file_path):
+        files = {
+            "pic": (file_path, open(file_path, 'rb'), 'image/jpeg')
+        }
+        data = {
+            "type": "json",
+            "st": await self.st(),
+            "_spr": "screen:2560x1440"
+        }
+        r = requests.post("https://m.weibo.cn/api/statuses/uploadPic", headers=self.header, data=data, files=files)
+        if r.status_code != 200:
+            raise UploadError(f"上传文件错误 {r.text}")
+        result = r.json()
+        return result["pic_id"]
 
     async def send_message(self, uid: Union[str, int], content: str, file_path: str):
 
@@ -215,21 +229,6 @@ class NetTool:
         }
         return await self.get(f"https://m.weibo.cn/profile/info", params=params)
 
-    async def upload_comment_file(self, file_path):
-        files = {
-            "pic": (file_path, open(file_path, 'rb'), 'image/jpeg')
-        }
-        params = {
-            "type": "json",
-            "st": await self.st(),
-            "_spr": "screen:2560x1440"
-        }
-        result = await self.post("https://m.weibo.cn/api/statuses/uploadPic", params=params, files=files)
-        if not result:
-            raise UploadError(f"上传文件错误 {result}")
-
-        return result["pic_id"]
-
     async def comment_weibo(self, mid, content, file_path=""):
         params = {
             "id": mid,
@@ -256,3 +255,6 @@ class NetTool:
         }
 
         return await self.post(f"https://m.weibo.cn/comments/destroy", params=params)
+
+    async def close(self):
+        await self.session.close()

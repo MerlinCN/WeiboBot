@@ -5,15 +5,15 @@ from types import FunctionType
 
 from tinydb import TinyDB, Query
 
-from .action import Action
-from .comment import Comment
-from .const import *
-from .exception import *
-from .message import Chat
-from .net_tool import NetTool
-from .user import User
-from .util import *
-from .weibo import Weibo
+from WeiboBot.action import Action
+from WeiboBot.comment import Comment
+from WeiboBot.const import *
+from WeiboBot.exception import *
+from WeiboBot.message import Chat
+from WeiboBot.net_tool import NetTool
+from WeiboBot.user import User
+from WeiboBot.util import *
+from WeiboBot.weibo import Weibo
 
 
 class Bot(User):
@@ -87,6 +87,9 @@ class Bot(User):
         await self.init_bot_info()
 
         return True
+
+    async def close(self):
+        await self.nettool.close()
 
     async def init_bot_info(self):
         raw_data = await self.nettool.user_info(self.id)
