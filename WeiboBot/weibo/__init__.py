@@ -102,6 +102,7 @@ class Weibo:
         self.user_c: Union[User, None] = None
         self.logger = get_logger(__name__)
         self.is_read = False
+        self.save_path: str = ""
 
     def parse(self, data):
 
