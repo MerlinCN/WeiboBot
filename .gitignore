@@ -142,3 +142,5 @@ tmp/
 
 #cofig json
 *.json
+qrcode.png
+*.db
