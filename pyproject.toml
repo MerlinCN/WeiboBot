@@ -1,0 +1,38 @@
+[project]
+name = "WeiboBot"
+version = "0.4.5"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.28.1",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pydantic>=2.11.5",
+    "tortoise-orm>=0.25.1",
+    "aiosqlite>=0.21.0",
+    "qrcode>=8.2",
+    "loguru>=0.7.3",
+    "pyqrcode>=1.2.1",
+    "pillow>=11.2.1",
+]
+description = "基于微博H5 API开发的机器人框架"
+readme = "README.md"
+authors = [
+    {name = "Merlin", email = "merlin@merlinblog.cn"},
+]
+classifiers = [
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.11",
+]
+
+[project.urls]
+Homepage = "https://github.com/MerlinCN/WeiboBot"
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov=WeiboBot --cov-report=term-missing"

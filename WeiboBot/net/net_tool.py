@@ -1,0 +1,640 @@
+import asyncio
+import json
+import re
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
+import httpx
+import qrcode
+from loguru import logger
+
+import WeiboBot.const as const
+from WeiboBot.model import Chat, ChatDetail, Comment, Page, User, Weibo
+from WeiboBot.util import get_cookies_value, load_cookies, save_cookies
+
+
+class NetTool:
+    def __init__(self, cookies: Union[str, dict, Path] = "") -> None:
+        """初始化网络工具类。
+
+        Args:
+            cookies (str): 微博的cookies字符串
+        """
+        super(NetTool, self).__init__()
+        self.client = httpx.AsyncClient(max_redirects=10)
+        self.mid: int = 0
+        self._last_refresh_token_time = 0
+        self._token_refresh_interval = 60  # 一分钟
+        if cookies:
+            if isinstance(cookies, str):
+                logger.info("从字符串加载cookies")
+                cookies_dict = json.loads(cookies)
+                for name, value in cookies_dict.items():
+                    self.client.cookies.set(name, value)
+            elif isinstance(cookies, dict):
+                logger.info("从字典加载cookies")
+                for name, value in cookies.items():
+                    self.client.cookies.set(name, value)
+            elif isinstance(cookies, Path):
+                logger.info("从文件加载cookies")
+                load_cookies(cookies, self.client)
+        else:
+            logger.info("未提供cookies，将使用扫码登录")
+
+    async def __aenter__(self):
+        await self.login()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.client.aclose()
+
+    async def _refresh_token(self):
+        response = await self.client.get(
+            "https://m.weibo.cn/api/config", headers={"Referer": "https://m.weibo.cn/"}
+        )
+        response.raise_for_status()
+        # Set-Cookie
+        result = response.json()
+        if result["data"]["login"]:
+            token = result["data"]["st"]
+            self.client.cookies.set("XSRF-TOKEN", token)
+
+    async def get_token(self) -> str:
+        now = time.time()
+        if now - self._last_refresh_token_time > self._token_refresh_interval:
+            await self._refresh_token()
+            self._last_refresh_token_time = now
+        return get_cookies_value(self.client, "XSRF-TOKEN")
+
+    async def login(self) -> int:
+        """登录微博。"""
+        if not self.client.cookies:
+            await self.login_by_qr_code()
+            return await self.check_login_status()
+        else:
+            return await self.check_login_status()
+
+    async def get_qrcode_url(self) -> str:
+        params = {
+            "entry": "wapsso",
+            "size": "180",
+        }
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+        }
+        response = await self.client.get(
+            "https://passport.weibo.com/sso/v2/qrcode/image",
+            params=params,
+            headers=headers,
+        )
+        response.raise_for_status()
+        result = response.json()
+        qrid = result["data"]["qrid"]
+        qrcode_url = f"https://passport.weibo.cn/signin/qrcode/scan?qr={qrid}"
+        qrcode_file = "qrcode.png"
+        logger.info(f"二维码URL: {qrcode_url}")
+        logger.info(
+            f"请使用微博扫描二维码登录，如果显示不全，可以打开根目录下的{qrcode_file}文件"
+        )
+        qr = qrcode.QRCode()
+        qr.add_data(qrcode_url)
+        qr.make(fit=True)
+        qr.print_ascii()
+        qr.make_image(fill_color="black", back_color="white").save(qrcode_file)
+        return qrid
+
+    async def login_by_qr_code(self):
+        qrid = await self.get_qrcode_url()
+        while True:
+            await asyncio.sleep(1)
+            params = {
+                "entry": "wapsso",
+                "source": "wapsso",
+                "url": "https://m.weibo.cn/",
+                "qrid": qrid,
+            }
+            headers = {
+                "Referer": "https://m.weibo.cn/",
+            }
+            response = await self.client.get(
+                "https://passport.weibo.com/sso/v2/qrcode/check",
+                params=params,
+                headers=headers,
+            )
+            response.raise_for_status()
+            result = response.json()
+            retcode = result["retcode"]
+            if retcode == 50114001:
+                logger.debug("二维码未使用")
+                continue
+            elif retcode == 50114003:
+                logger.info("二维码已过期")
+                qrid = await self.get_qrcode_url()
+            elif retcode == 50114002:
+                logger.info("成功扫描，请在手机点击确认以登录")
+            else:
+                logger.info("二维码已使用")
+                logger.info(result)
+                alt = result.get("data", {}).get("url")
+                logger.info(f"跳转 URL: {alt}")
+                # 访问跳转链接，完成登录
+                headers = {
+                    "Referer": "https://m.weibo.cn/",
+                }
+                final_response = await self.client.get(
+                    alt, follow_redirects=True, headers=headers
+                )
+                final_response.raise_for_status()
+                save_cookies(Path("cookies.json"), self.client)
+                # 此时，client.cookies 中包含了登录后的 Cookies
+                return
+
+    async def check_login_status(self) -> int:
+        logger.info("检查登录状态……")
+        url = "https://m.weibo.cn/api/config"
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+        }
+        response = await self.client.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        isLogin = data["data"]["login"]
+        if not isLogin:
+            logger.info("未登录")
+            return 0
+        token = data["data"]["st"]
+        self.client.cookies.set("XSRF-TOKEN", token)
+        self._last_refresh_token_time = time.time()
+        self.mid = int(data["data"]["uid"])
+        return self.mid
+
+    async def user_info(self, user_id: int) -> User:
+        """获取用户信息。
+
+        Args:
+            user_id (int): 用户ID
+
+        Returns:
+            User: 用户信息
+        """
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+            "x-xsrf-token": await self.get_token(),
+        }
+        params = {
+            "uid": user_id,
+        }
+        response = await self.client.get(
+            "https://m.weibo.cn/profile/info", params=params, headers=headers
+        )
+        response.raise_for_status()
+        result = response.json()
+        user = User.model_validate(result["data"]["user"])
+        user.statuses = [Weibo.model_validate(weibo) for weibo in result["data"]["statuses"]]
+        return user
+
+    async def post_weibo(self, content: str, visible: const.VISIBLE) -> Optional[Weibo]:
+        """发布微博。
+
+        Args:
+            content (str): 微博内容
+            visible (const.VISIBLE): 可见性设置
+
+        Returns:
+            Dict[str, Any]: 发布结果
+        """
+        params = {
+            "content": content,
+            "visible": visible.value,
+            "st": await self.get_token(),
+        }
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+            "x-xsrf-token": await self.get_token(),
+        }
+        response = await self.client.post(
+            "https://m.weibo.cn/api/statuses/update", params=params, headers=headers
+        )
+        response.raise_for_status()
+        result = response.json()
+
+        if result["ok"] == 1:
+            weibo = Weibo.model_validate(result["data"])
+            return weibo
+        else:
+            logger.error(f"发布微博失败: {result}")
+            return None
+
+    async def repost_weibo(
+        self, mid: Union[str, int], content: str, dualPost: bool
+    ) -> Dict[str, Any]:
+        """转发微博。
+
+        Args:
+            mid (Union[str, int]): 微博ID
+            content (str): 转发内容
+            dualPost (bool): 是否同时评论
+
+        Returns:
+            Dict[str, Any]: 转发结果
+        """
+        params = {
+            "id": mid,
+            "content": content,
+            "mid": mid,
+            "st": await self.get_token(),
+            "dualPost": int(dualPost),
+        }
+
+        response = await self.client.post(
+            "https://m.weibo.cn/api/statuses/repost", params=params
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def extend_weibo(self, mid: Union[str, int]) -> Dict[str, Any]:
+        """获取长微博"""
+        params = {
+            "id": mid,
+        }
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+            "x-xsrf-token": await self.get_token(),
+        }
+        response = await self.client.get(
+            "https://m.weibo.cn/api/statuses/extend", params=params, headers=headers
+        )
+        response.raise_for_status()
+        result = response.json()
+        return result
+
+    async def weibo_info(self, mid: Union[str, int], comments_count: int = 0) -> Weibo:
+        """获取微博详细信息。
+
+        Args:
+            mid (Union[str, int]): 微博ID
+
+        Returns:
+            Weibo: 微博信息
+        """
+        url = f"https://m.weibo.cn/detail/{mid}"
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+            "x-xsrf-token": await self.get_token(),
+        }
+        response = await self.client.get(url, headers=headers)
+        response.raise_for_status()
+        r = response.text
+        result = json.loads(
+            re.findall(r"(?<=render_data = \[)[\s\S]*(?=\]\[0\])", r)[0]
+        )["status"]
+        weibo = Weibo.model_validate(result)
+        weibo.comments = await self.get_weibo_comments(mid,comments_count)
+        return weibo
+
+    async def get_weibo_comments(self, mid: Union[str, int], count: int = 20) -> List[Comment]:
+        """获取微博评论。
+        Args:
+            mid (Union[str, int]): 微博ID
+            count (int): 获取评论数量，默认20条，-1表示获取所有评论
+        Returns:
+            List[Comment]: 评论列表
+        """
+        comments = []
+        max_id = 0
+        if count == 0:
+            return []
+        while True:
+            url = "https://m.weibo.cn/comments/hotflow"
+            headers = {
+                "Referer": "https://m.weibo.cn/",
+                "x-xsrf-token": await self.get_token(),
+            }
+            params = {
+                "id": mid,
+                "mid": mid,
+                "max_id": max_id,
+                "max_id_type": 0,
+            }
+            
+            response = await self.client.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            result = response.json()
+            
+            if not comments:  # 第一次请求
+                total = result["data"]["total_number"]
+                if count != -1:
+                    count = min(count, total)
+            
+            new_comments = [
+                Comment.model_validate(data)
+                for data in result["data"]["data"]
+                if data["id"] not in [c.id for c in comments]
+            ]
+            comments.extend(new_comments)
+            
+            max_id = result["data"]["max_id"]
+            if max_id == 0 or (count != -1 and len(comments) >= count):
+                break
+                
+        return comments if count == -1 else comments[:count]
+
+    
+    async def upload_chat_file(self, tuid: int, file_path: str) -> Dict[str, Any]:
+        #totest: 上传聊天文件
+        """上传聊天文件。
+
+        Args:
+            tuid (int): 接收者用户ID
+            file_path (str): 文件路径
+
+        Returns:
+            Dict[str, Any]: 上传结果
+        """
+        files = {"file": (file_path, open(file_path, "rb"), "image/jpeg")}
+        data = {"tuid": tuid, "st": await self.get_token()}
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+            "x-xsrf-token": await self.get_token(),
+        }
+        response = await self.client.post(
+            "https://m.weibo.cn/api/chat/upload",
+            headers=headers,
+            data=data,
+            files=files,
+        )
+        response.raise_for_status()
+        result = response.json()
+        return result
+
+    async def upload_comment_file(self, file_path: str) -> Dict[str, Any]:
+        #totest: 上传评论图片
+        """上传评论图片。
+
+        Args:
+            file_path (str): 图片文件路径
+
+        Returns:
+            Dict[str, Any]: 上传结果
+        """
+        files = {"pic": (file_path, open(file_path, "rb"), "image/jpeg")}
+        data = {"type": "json", "st": await self.get_token()}
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+            "x-xsrf-token": await self.get_token(),
+        }
+        response = await self.client.post(
+            "https://m.weibo.cn/api/statuses/uploadPic",
+            headers=headers,
+            data=data,
+            files=files,
+        )
+        response.raise_for_status()
+        result = response.json()
+        return result
+
+    async def send_message(
+        self, uid: Union[str, int], content: str, file_path: str
+    ) -> Dict[str, Any]:
+        #totest: 发送私信
+        """发送私信。
+
+        Args:
+            uid (Union[str, int]): 接收者用户ID
+            content (str): 消息内容
+            file_path (str): 附件文件路径
+
+        Returns:
+            Dict[str, Any]: 发送结果
+        """
+        params = {
+            "uid": int(uid),
+            "content": content,
+            "st": await self.get_token(),
+        }
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+            "x-xsrf-token": await self.get_token(),
+        }
+        if file_path:
+            media_type = const.MEDIA.PHOTO.value
+            try:
+                fids = await self.upload_chat_file(tuid=int(uid), file_path=file_path)
+            except Exception as e:
+                logger.error(f"文件上传失败 {e}")
+                return {}
+            params["media_type"] = media_type
+            params["content"] = ""
+            params["fids"] = fids
+
+        response = await self.client.post(
+            "https://m.weibo.cn/api/chat/send", params=params, headers=headers
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def user_chat(
+        self, uid: Union[str, int], since_id: int = 0, is_continuous=0
+    ) -> ChatDetail:
+        """获取与指定用户的聊天记录。
+
+        Args:
+            uid (Union[str, int]): 用户ID
+            since_id (int): 起始消息ID
+
+        Returns:
+            ChatDetail: 聊天记录
+        """
+        params = {
+            "count": 20,
+            "uid": uid,
+            "since_id": since_id,
+            "is_continuous": is_continuous,
+        }
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+            "x-xsrf-token": await self.get_token(),
+        }
+        response = await self.client.get(
+            "https://m.weibo.cn/api/chat/list", params=params, headers=headers
+        )
+        response.raise_for_status()
+
+        data = response.json()
+        return ChatDetail.model_validate(data["data"])
+
+    async def chat_list(self, page: int = 1) -> List[Chat]:
+        """获取聊天列表。
+
+        Args:
+            page (int): 页码
+
+        Returns:
+            List[Chat]: 聊天列表
+        """
+        params = {"page": page}
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+            "x-xsrf-token": await self.get_token(),
+        }
+        response = await self.client.get(
+            "https://m.weibo.cn/message/msglist", params=params, headers=headers
+        )
+        response.raise_for_status()
+        result = response.json()
+        chat_list = [Chat.model_validate(chat) for chat in result["data"]]
+        return chat_list
+
+    async def mentions_cmt(self, page: int = 1) -> Dict[str, Any]:
+        """获取@我的评论。
+
+        Args:
+            page (int): 页码
+
+        Returns:
+            Dict[str, Any]: @我的评论列表
+        """
+        params = {"page": page}
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+            "x-xsrf-token": await self.get_token(),
+        }
+        response = await self.client.get(
+            "https://m.weibo.cn/message/mentionsCmt", params=params, headers=headers
+        )
+        response.raise_for_status()
+        data = response.json()
+        cmt_list = [Comment.model_validate(cmt) for cmt in data["data"]]
+        return cmt_list
+
+    async def refresh_page(self, max_id: int = 0) -> Page:
+        """刷新关注页面。
+
+        Args:
+            max_id (Union[str, int]): 最大ID
+
+        Returns:
+            Page: 关注页面，注意里面的statuses不是完整微博，需要用weibo_info获取
+        """
+        params = {"max_id": max_id}
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+            "x-xsrf-token": await self.get_token(),
+        }
+        response = await self.client.get(
+            "https://m.weibo.cn/feed/friends", params=params, headers=headers
+        )
+        response.raise_for_status()
+        result = response.json()
+        page = Page.model_validate(result["data"])
+        return page
+
+    async def like(self, mid: Union[str, int]) -> Dict[str, Any]:
+        #totest
+        """点赞微博。
+
+        Args:
+            mid (Union[str, int]): 微博ID
+
+        Returns:
+            Dict[str, Any]: 点赞结果
+        """
+        params = {
+            "id": mid,
+            "attitude": "heart",
+            "st": await self.get_token(),
+        }
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+            "x-xsrf-token": await self.get_token(),
+        }
+        response = await self.client.post(
+            "https://m.weibo.cn/api/attitudes/create", params=params, headers=headers
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def del_weibo(self, mid: Union[str, int]) -> bool:
+        """删除微博。
+
+        Args:
+            mid (Union[str, int]): 微博ID
+
+        Returns:
+            Dict[str, Any]: 删除结果
+        """
+        params = {"mid": mid, "st": await self.get_token()}
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+            "x-xsrf-token": await self.get_token(),
+        }
+        response = await self.client.post(
+            "https://m.weibo.cn/profile/delMyblog", params=params, headers=headers
+        )
+        response.raise_for_status()
+        result = response.json()
+        if result["ok"] == 1:
+            return True
+        else:
+            logger.error(f"删除微博失败: {result}")
+            return False
+
+    async def comment_weibo(
+        self, mid: Union[str, int], content: str, file_path: str = ""
+    ) -> Dict[str, Any]:
+        #totest
+        """评论微博。
+
+        Args:
+            mid (Union[str, int]): 微博ID
+            content (str): 评论内容
+            file_path (str, optional): 图片文件路径. 默认为空字符串.
+
+        Returns:
+            Dict[str, Any]: 评论结果
+        """
+        params = {
+            "id": mid,
+            "mid": mid,
+            "content": content,
+            "st": await self.get_token(),
+        }
+
+        if file_path:
+            try:
+                pic_ids = await self.upload_comment_file(file_path=file_path)
+            except Exception as e:
+                logger.error(f"文件上传失败 {e}")
+                return {}
+            params["picId"] = pic_ids
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+            "x-xsrf-token": await self.get_token(),
+        }
+        response = await self.client.post(
+            "https://m.weibo.cn/api/comments/create", params=params, headers=headers
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def del_comment(self, cid: Union[str, int]) -> Dict[str, Any]:
+        #totest
+        """删除评论。
+
+        Args:
+            cid (Union[str, int]): 评论ID
+
+        Returns:
+            Dict[str, Any]: 删除结果
+        """
+        params = {"cid": cid, "st": await self.get_token()}
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+            "x-xsrf-token": await self.get_token(),
+        }
+        response = await self.client.post(
+            "https://m.weibo.cn/comments/destroy", params=params, headers=headers
+        )
+        response.raise_for_status()
+        return response.json()

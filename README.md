@@ -14,88 +14,97 @@ _基于微博H5 API开发的机器人框架_
 
 
 
-WeiboBot 是一个基于微博H5 API开发的机器人框架，提供了一个简单的接口，可以让你的机器人更加简单的接入微博，并且提供了一些简单的指令，比如：转评赞，回复消息等
+WeiboBot 是一个基于微博H5 API开发的爬虫框架，提供了简单的接口，包括了一些指令，比如：转评赞，回复消息等
+可以选择直接获取数据，也可以持续运行
+
 
 ## 安装
 
 `pip install WeiboBot`
 
-## 开始使用(事件驱动模式)
+## 开始使用(生命周期)
 
 ```python
-from WeiboBot import Bot
-from WeiboBot.message import Chat
-from WeiboBot.weibo import Weibo
-from WeiboBot.comment import Comment
+from pathlib import Path
 
-from datetime import datetime
+from WeiboBot import Bot, ChatDetail, Comment, Weibo
+from loguru import logger
 
-cookies = "your cookies"
+cookies = Path("cookies.json")
 myBot = Bot(cookies=cookies)
 
 
-@myBot.onNewMsg  # 被私信的时候触发
-async def on_msg(chat: Chat):
-    for msg in chat.msg_list:  # 消息列表
-        print(f"{msg.sender_screen_name}:{msg.text}")
+@myBot.onNewMsg()  # 被私信的时候触发
+async def on_msg(chat: ChatDetail):
+    for msg in chat.msgs:  # 消息列表
+        logger.info(f"{msg.sender_screen_name}:{msg.text}")
 
 
-@myBot.onNewWeibo  # 首页刷到新微博时触发
+@myBot.onNewWeibo()  # 首页刷到新微博时触发
 async def on_weibo(weibo: Weibo):
-    if weibo.original_weibo is None:  # 是原创微博
-        print(f"{weibo.text}")
+    logger.info(f"{weibo.text}")
 
 
-@myBot.onMentionCmt  # 提及我的评论时触发
+@myBot.onMentionCmt()  # 提及我的评论时触发
 async def on_mention_cmt(cmt: Comment):
-    print(f"{cmt.text}")
+    logger.info(f"收到{cmt.mid}的评论")
 
 
-@myBot.onTick  # 每次循环触发
+@myBot.onTick()  # 每次循环触发
 async def on_tick():
-    print(datetime.now())
+    logger.info("tick")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     myBot.run()
 
 ```
 
-## 开始使用(主动模式)
+## 开始使用(仅调用)
 
 ```python
-from WeiboBot import Bot
-from WeiboBot.const import *
 import asyncio
+from pathlib import Path
 
-cookies = "your cookies"
-myBot = Bot(cookies=cookies)
+import WeiboBot.const as const
+from WeiboBot import NetTool
+from loguru import logger
+
+cookies = Path("cookies.json")  # 没有会开启扫码登录
 
 
 async def main():
-    await asyncio.wait_for(myBot.login(), timeout=10)  # 先登录
-    weibo_example1 = myBot.get_weibo(123456789)  # 获取微博
-    weibo_example2 = myBot.post_weibo("发一条微博", visible=VISIBLE.ALL)
+    async with NetTool(cookies) as nettool:
+        user = await nettool.user_info(nettool.mid)
+        logger.info(user)
+        weibo_example1 = await nettool.weibo_info(123456)  # 获取微博
+        weibo_example2 = await nettool.post_weibo(
+            "发一条微博", visible=const.VISIBLE.ONLY_ME
+        )
     # ...... 其他操作
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())
+
 
 ```
 
-## 如何获取cookie
+## 更新路线图
 
-登录m.weibo.cn
+目前项目仍在重构中
 
-按F12查看请求头
+- [ ] 对旧API的整合
 
-![image](https://user-images.githubusercontent.com/37311477/164148500-c6a19f75-d1fd-48e6-9850-6c5380847dcd.png)
+- [ ] 扩展更加多的API
 
+- [ ] 提升登录的健壮性
 
 ## 示例
 
 [好康Bot](https://github.com/MerlinCN/WeiboWatchdog)
+
+正在重构中
 
 > 一个转发小姐姐的Bot
 
