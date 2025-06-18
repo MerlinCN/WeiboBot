@@ -27,7 +27,9 @@ from WeiboBot.util import get_cookies_value, load_cookies, save_cookies
 
 
 class NetTool:
-    def __init__(self, cookies: Union[str, dict, Path] = Path("cookies.json")) -> None:
+    def __init__(
+        self, cookies: Union[str, dict, Path] = Path("weibobot_cookies.json")
+    ) -> None:
         """初始化网络工具类。
 
         Args:
@@ -37,7 +39,8 @@ class NetTool:
         self.client = httpx.AsyncClient(max_redirects=10)
         self.mid: int = 0
         self._last_refresh_token_time = 0
-        self._token_refresh_interval = 60  # 一分钟
+        self._token_refresh_interval = 60 * 10  # 10分钟
+        self.cookies_path = cookies
         if isinstance(cookies, str):
             logger.info("从字符串加载cookies")
             cookies_dict = json.loads(cookies)
@@ -64,11 +67,24 @@ class NetTool:
             "https://m.weibo.cn/api/config", headers={"Referer": "https://m.weibo.cn/"}
         )
         response.raise_for_status()
-        # Set-Cookie
+        for cookie in response.cookies.jar:
+            logger.debug(
+                f"Cookie: {cookie.name}={cookie.value} "
+                f"Domain={cookie.domain} "
+                f"Path={cookie.path} "
+                f"Expires={cookie.expires}"
+            )
+            # 直接设置到 client 的 cookies 中
+            self.client.cookies.set(
+                cookie.name, cookie.value, domain=cookie.domain, path=cookie.path
+            )
+
+        # 原有的 token 处理
         result = response.json()
         if result["data"]["login"]:
             token = result["data"]["st"]
-            self.client.cookies.set("XSRF-TOKEN", token)
+            self.client.cookies.set("XSRF-TOKEN", token, domain="m.weibo.cn")
+            save_cookies(self.cookies_path, self.client)
 
     async def get_token(self) -> str:
         now = time.time()
@@ -156,7 +172,7 @@ class NetTool:
                     alt, follow_redirects=True, headers=headers
                 )
                 final_response.raise_for_status()
-                save_cookies(Path("cookies.json"), self.client)
+                save_cookies(self.cookies_path, self.client)
                 # 此时，client.cookies 中包含了登录后的 Cookies
                 return
 

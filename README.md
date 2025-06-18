@@ -30,8 +30,7 @@ from pathlib import Path
 from WeiboBot import Bot, ChatDetail, Comment, Weibo
 from loguru import logger
 
-cookies = Path("cookies.json")
-myBot = Bot(cookies=cookies)
+myBot = Bot()
 
 
 @myBot.onNewMsg()  # 被私信的时候触发
@@ -93,7 +92,7 @@ if __name__ == "__main__":
 
 - [x]  对旧API的整合
 - [ ]  扩展更加多的API
-- [ ]  提升登录的健壮性
+- [x]  提升登录的健壮性
 - [ ]  增加更多测试用例和自动化
 - [ ]  去掉 logger
 
