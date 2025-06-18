@@ -28,3 +28,7 @@ class SendMessageError(Exception):
 
 class LikeWeiboError(Exception):
     pass
+
+
+class RepostWeiboError(Exception):
+    pass

@@ -1,6 +1,6 @@
 [project]
 name = "WeiboBot"
-version = "1.0.0"
+version = "1.1.0"
 requires-python = ">=3.11"
 dependencies = [
     "httpx>=0.28.1",
@@ -31,11 +31,8 @@ keywords = ["weibo", "bot", "weibo-bot", "weibo-api", "weibo-sdk"]
 [project.urls]
 Homepage = "https://github.com/MerlinCN/WeiboBot"
 
-[build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
+[project.optional-dependencies]
+screenshot = [
+    "playwright>=1.52.0",
+]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-addopts = "-v --cov=WeiboBot --cov-report=term-missing"

@@ -1,0 +1,37 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+
+# 添加权限配置
+permissions:
+    contents: write
+      
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 uv
+        run: pip install uv
+
+      - name: 构建包
+        run: uv build
+
+      - name: 发布到 PyPI
+        env:
+          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        run: uv publish --token $PYPI_TOKEN
+
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
