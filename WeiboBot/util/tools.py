@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import List
 
 import httpx
 
@@ -33,3 +34,21 @@ def get_cookies_value(client: httpx.AsyncClient, name: str) -> str:
         if cookie.name == name:
             return cookie.value
     return ""
+
+
+def httpx_cookies_to_playwright(httpx_cookies) -> List[dict]:
+    cookies = []
+    for cookie in httpx_cookies:
+        # Playwright 需要 domain 不带前导点
+        cookies.append(
+            {
+                "name": cookie.name,
+                "value": cookie.value,
+                "domain": "weibo.cn",
+                "path": cookie.path,
+                "expires": cookie.expires or -1,
+                "httpOnly": False,
+                "secure": cookie.secure,
+            }
+        )
+    return cookies

@@ -17,10 +17,29 @@ _基于微博H5 API开发的爬虫框架_
 WeiboBot 是一个基于微博H5 API开发的爬虫框架，提供了简单的接口，包括了一些指令，比如：转评赞，回复消息等
 可以选择直接获取数据，也可以持续运行
 
-
 ## 安装
 
-`pip install WeiboBot`
+### 普通安装
+
+```bash
+pip install WeiboBot
+```
+
+### 带截图功能
+
+```bash
+pip install WeiboBot[screenshot]
+```
+
+### 源码安装（推荐使用uv）
+
+```bash
+uv sync --all-extras
+```
+
+
+
+
 
 ## 开始使用(生命周期)
 

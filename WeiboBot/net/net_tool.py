@@ -24,7 +24,12 @@ from WeiboBot.exception import (
 )
 from WeiboBot.model import Chat, ChatDetail, Comment, Page, User, Weibo
 from WeiboBot.typing import CID, MID
-from WeiboBot.util import get_cookies_value, load_cookies, save_cookies
+from WeiboBot.util import (
+    get_cookies_value,
+    httpx_cookies_to_playwright,
+    load_cookies,
+    save_cookies,
+)
 
 
 class NetTool:
@@ -595,7 +600,7 @@ class NetTool:
             mid (Union[str, int]): 微博ID
 
         Returns:
-            Dict[str, Any]: 删除结果
+            bool: 删除结果
         """
         params = {"mid": mid, "st": await self.get_token()}
         headers = {
@@ -620,7 +625,7 @@ class NetTool:
         Args:
             mid (Union[str, int]): 微博ID
             content (str): 评论内容
-            file_path (str, optional): 图片文件路径. 默认为空字符串.
+            file (Path, optional): 图片文件路径. 默认为空.
 
         Returns:
             Comment: 评论结果
@@ -657,7 +662,7 @@ class NetTool:
             cid (Union[str, int]): 评论ID
 
         Returns:
-            Dict[str, Any]: 删除结果
+            bool: 删除结果
         """
         params = {"cid": int(cid), "st": await self.get_token()}
         headers = {
@@ -673,3 +678,65 @@ class NetTool:
             return True
         else:
             raise DeleteCommentError(result["msg"])
+
+    @staticmethod
+    async def _ensure_browser_installed():
+        try:
+            import subprocess
+
+            subprocess.run(
+                ["playwright", "install", "chromium"], check=True, capture_output=True
+            )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"安装 Chromium 失败: {e.stderr.decode()}")
+
+    async def screenshot_weibo(self, url: str) -> bytes:
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError:
+            raise ImportError("请安装playwright")
+        async with async_playwright() as p:
+            try:
+                browser = await p.chromium.launch(headless=True)
+            except Exception as e:
+                if "Executable doesn't exist" in str(
+                    e
+                ) or "Chromium revision is not downloaded" in str(e):
+                    await self._ensure_browser_installed()
+                    browser = await p.chromium.launch(headless=True)
+                else:
+                    raise
+            # iPhone 15
+            iphone_15 = p.devices["iPhone 15"]
+            context = await browser.new_context(
+                **iphone_15,
+            )
+            # 1. 转换 httpx cookies
+            cookies = httpx_cookies_to_playwright(self.client.cookies.jar)
+            # 2. 设置 cookies
+            if cookies:
+                await context.add_cookies(cookies)
+            page = await context.new_page()
+            await page.goto(url)
+            await page.wait_for_load_state("networkidle")
+            # 移除 #app > div.lite-page-wrap > div > div.lite-page-editor > div
+            await page.evaluate(
+                """
+                const element1 = document.querySelector('#app > div.lite-page-wrap > div > div.main > div > div.wrap');
+                if (element1) {
+                    element1.remove();
+                };
+                const element2 = document.querySelector('#app > div.lite-page-wrap > div > div.lite-page-editor');
+                if (element2) {
+                    element2.remove();
+                };
+
+                """
+            )
+
+            element = page.locator(
+                "#app > div.lite-page-wrap > div > div.main > div.card"
+            )
+            img = await element.screenshot()
+            await browser.close()
+            return img
