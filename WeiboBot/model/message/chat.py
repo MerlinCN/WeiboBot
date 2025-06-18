@@ -2,15 +2,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from WeiboBot.typing import MID
 
+from ..base import MetaBaseModel
+
 if TYPE_CHECKING:
-    from WeiboBot.model import User
+    from . import User
 
 
-class ChatUser(BaseModel):
+class ChatUser(MetaBaseModel):
     id: int = Field(description="用户ID/群ID")
     screen_name: str = Field(description="用户昵称/群昵称")
     avatar_large: str = Field(description="头像/群头像")
@@ -20,7 +22,7 @@ class ChatUser(BaseModel):
     verified_type_ext: int = Field(description="认证类型扩展")
 
 
-class Chat(BaseModel):
+class Chat(MetaBaseModel):
     created_at: str = Field(description="创建时间")
     scheme: str = Field(description="详情url")
     unread: int = Field(description="未读消息数")
@@ -31,7 +33,7 @@ class Chat(BaseModel):
         extra = "ignore"
 
 
-class Message(BaseModel):
+class Message(MetaBaseModel):
     created_at: str = Field(description="创建时间")
     dm_type: int = Field(description="消息类型")
     id: str = Field(description="消息ID")
@@ -48,7 +50,7 @@ class Message(BaseModel):
         extra = "ignore"
 
 
-class ChatDetail(BaseModel):
+class ChatDetail(MetaBaseModel):
     total_number: Optional[int] = Field(description="总数")
     following: Optional[bool] = Field(description="是否关注")
     last_read_mid: Optional[int] = Field(description="最后阅读的MID")
