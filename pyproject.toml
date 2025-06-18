@@ -13,6 +13,8 @@ dependencies = [
     "loguru>=0.7.3",
     "pyqrcode>=1.2.1",
     "pillow>=11.2.1",
+    "socksio>=1.0.0",
+    "bs4>=0.0.2",
 ]
 description = "基于微博H5 API开发的机器人框架"
 readme = "README.md"

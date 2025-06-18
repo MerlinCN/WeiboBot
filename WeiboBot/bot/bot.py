@@ -39,7 +39,7 @@ def interval_control(interval: float):
 class Bot(NetTool):
     def __init__(
         self,
-        cookies: Union[str, dict, Path] = "",
+        cookies: Union[str, dict, Path] = Path("weibobot_cookies.json"),
         db_path: Path = "weibo_bot.db",
     ):
         super(Bot, self).__init__(cookies)
