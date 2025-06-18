@@ -1,12 +1,13 @@
 from typing import TYPE_CHECKING, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+from ..base import MetaBaseModel
 
 if TYPE_CHECKING:
-    from WeiboBot.model.weibo import Weibo
+    from ..weibo import Weibo
 
 
-class User(BaseModel):
+class User(MetaBaseModel):
     id: int = Field(description="用户id")
     screen_name: str = Field(description="用户昵称")
     profile_image_url: str = Field(description="用户头像")

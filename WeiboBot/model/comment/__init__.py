@@ -1,11 +1,14 @@
 from typing import TYPE_CHECKING, List, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from ..base import MetaBaseModel
 
 if TYPE_CHECKING:
-    from WeiboBot.model.user import User
+    from ..user import User
 
-class Comment(BaseModel):
+
+class Comment(MetaBaseModel):
     """评论模型"""
 
     id: int = Field(description="评论ID")
@@ -20,6 +23,7 @@ class Comment(BaseModel):
     is_liked: bool = Field(False, description="是否已点赞")
     is_followed: bool = Field(False, description="是否已关注评论用户")
     user: "User" = Field(None, description="评论用户")
-    comments: Union[List["Comment"], None,bool] = Field(None, description="子评论列表")
+    comments: Union[List["Comment"], None, bool] = Field(None, description="子评论列表")
+
     class Config:
         extra = "ignore"
