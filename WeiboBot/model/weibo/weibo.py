@@ -28,9 +28,6 @@ class Weibo(MetaBaseModel):
     pics: Optional[list[dict]] = Field(default_factory=list, description="配图")
     page_info: Optional[dict] = Field(default_factory=dict, description="页面信息")
     longText: Optional[dict] = Field(default_factory=dict, description="长文本")
-    retweeted_status: Optional[dict] = Field(
-        default_factory=dict, description="转发状态"
-    )
     deleted: Optional[str] = Field(default="0", description="是否已删除")
     retweeted_status: Optional["Weibo"] = Field(default=None, description="原始微博")
     comments: Optional[List["Comment"]] = Field(default=None, description="评论列表")
