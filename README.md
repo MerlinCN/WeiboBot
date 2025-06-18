@@ -37,10 +37,6 @@ pip install WeiboBot[screenshot]
 uv sync --all-extras
 ```
 
-
-
-
-
 ## 开始使用(生命周期)
 
 ```python
