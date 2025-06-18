@@ -1,6 +1,6 @@
 [project]
 name = "WeiboBot"
-version = "0.4.5"
+version = "1.0.0"
 requires-python = ">=3.11"
 dependencies = [
     "httpx>=0.28.1",
@@ -26,6 +26,7 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.11",
 ]
+keywords = ["weibo", "bot", "weibo-bot", "weibo-api", "weibo-sdk"]
 
 [project.urls]
 Homepage = "https://github.com/MerlinCN/WeiboBot"
