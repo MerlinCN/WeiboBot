@@ -3,7 +3,7 @@ import json
 import re
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import List, Optional, Union
 
 import httpx
 import qrcode
@@ -17,6 +17,7 @@ from WeiboBot.exception import (
     DeleteWeiboError,
     LikeWeiboError,
     PostWeiboError,
+    RepostWeiboError,
     SendMessageError,
     UploadPicError,
     WeiboNotExist,
@@ -193,6 +194,7 @@ class NetTool:
         self.client.cookies.set("XSRF-TOKEN", token)
         self._last_refresh_token_time = time.time()
         self.mid = int(data["data"]["uid"])
+        logger.info(f"登录成功，用户ID: {self.mid}")
         return self.mid
 
     async def user_info(self, user_id: MID) -> User:
@@ -254,8 +256,8 @@ class NetTool:
             raise PostWeiboError(result["msg"])
 
     async def repost_weibo(
-        self, mid: MID, content: str, dualPost: bool
-    ) -> Dict[str, Any]:
+        self, mid: MID, content: str, dualPost: bool = False
+    ) -> Weibo:
         """转发微博。
 
         Args:
@@ -264,7 +266,7 @@ class NetTool:
             dualPost (bool): 是否同时评论
 
         Returns:
-            Dict[str, Any]: 转发结果
+            Weibo: 转发结果
         """
         params = {
             "id": mid,
@@ -273,12 +275,22 @@ class NetTool:
             "st": await self.get_token(),
             "dualPost": int(dualPost),
         }
-
+        headers = {
+            "Referer": "https://m.weibo.cn/",
+            "x-xsrf-token": await self.get_token(),
+        }
         response = await self.client.post(
-            "https://m.weibo.cn/api/statuses/repost", params=params
+            "https://m.weibo.cn/api/statuses/repost",
+            params=params,
+            headers=headers,
         )
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+        if result["ok"] == 1:
+            weibo = Weibo.model_validate(result["data"])
+            return weibo
+        else:
+            raise RepostWeiboError(result["msg"])
 
     async def weibo_info(self, mid: MID, comments_count: int = 0) -> Weibo:
         """获取微博详细信息。

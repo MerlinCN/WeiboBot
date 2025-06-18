@@ -25,37 +25,37 @@ WeiboBot 是一个基于微博H5 API开发的爬虫框架，提供了简单的�
 ## 开始使用(生命周期)
 
 ```python
-from pathlib import Path
-
-from WeiboBot import Bot, ChatDetail, Comment, Weibo
 from loguru import logger
 
-myBot = Bot()
+from WeiboBot import Bot, ChatDetail, Comment, Weibo
+
+bot = Bot()
 
 
-@myBot.onNewMsg()  # 被私信的时候触发
+@bot.onNewMsg()  # 被私信的时候触发
 async def on_msg(chat: ChatDetail):
     for msg in chat.msgs:  # 消息列表
         logger.info(f"{msg.sender_screen_name}:{msg.text}")
 
 
-@myBot.onNewWeibo()  # 首页刷到新微博时触发
+@bot.onNewWeibo()  # 首页刷到新微博时触发
 async def on_weibo(weibo: Weibo):
+    weibo = await bot.weibo_info(weibo.mid)  # 获取微博详细信息(长微博才需要)
     logger.info(f"{weibo.text}")
 
 
-@myBot.onMentionCmt()  # 提及我的评论时触发
+@bot.onMentionCmt()  # 提及我的评论时触发
 async def on_mention_cmt(cmt: Comment):
     logger.info(f"收到{cmt.mid}的评论")
 
 
-@myBot.onTick()  # 每次循环触发
+@bot.onTick()  # 每次循环触发
 async def on_tick():
     logger.info("tick")
 
 
 if __name__ == "__main__":
-    myBot.run()
+    bot.run()
 
 ```
 
@@ -64,9 +64,10 @@ if __name__ == "__main__":
 ```python
 import asyncio
 
+from loguru import logger
+
 import WeiboBot.const as const
 from WeiboBot import NetTool
-from loguru import logger
 
 
 async def main():
@@ -82,8 +83,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
 ```
 
 ## 更新路线图
