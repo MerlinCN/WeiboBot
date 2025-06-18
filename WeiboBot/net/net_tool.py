@@ -7,15 +7,27 @@ from typing import Any, Dict, List, Optional, Union
 
 import httpx
 import qrcode
+from bs4 import BeautifulSoup
 from loguru import logger
 
 import WeiboBot.const as const
+from WeiboBot.exception import (
+    CommentError,
+    DeleteCommentError,
+    DeleteWeiboError,
+    LikeWeiboError,
+    PostWeiboError,
+    SendMessageError,
+    UploadPicError,
+    WeiboNotExist,
+)
 from WeiboBot.model import Chat, ChatDetail, Comment, Page, User, Weibo
+from WeiboBot.typing import CID, MID
 from WeiboBot.util import get_cookies_value, load_cookies, save_cookies
 
 
 class NetTool:
-    def __init__(self, cookies: Union[str, dict, Path] = "") -> None:
+    def __init__(self, cookies: Union[str, dict, Path] = Path("cookies.json")) -> None:
         """初始化网络工具类。
 
         Args:
@@ -26,21 +38,19 @@ class NetTool:
         self.mid: int = 0
         self._last_refresh_token_time = 0
         self._token_refresh_interval = 60  # 一分钟
-        if cookies:
-            if isinstance(cookies, str):
-                logger.info("从字符串加载cookies")
-                cookies_dict = json.loads(cookies)
-                for name, value in cookies_dict.items():
-                    self.client.cookies.set(name, value)
-            elif isinstance(cookies, dict):
-                logger.info("从字典加载cookies")
-                for name, value in cookies.items():
-                    self.client.cookies.set(name, value)
-            elif isinstance(cookies, Path):
-                logger.info("从文件加载cookies")
-                load_cookies(cookies, self.client)
-        else:
-            logger.info("未提供cookies，将使用扫码登录")
+        if isinstance(cookies, str):
+            logger.info("从字符串加载cookies")
+            cookies_dict = json.loads(cookies)
+            for name, value in cookies_dict.items():
+                self.client.cookies.set(name, value)
+        elif isinstance(cookies, dict):
+            logger.info("从字典加载cookies")
+            for name, value in cookies.items():
+                self.client.cookies.set(name, value)
+        elif isinstance(cookies, Path):
+            logger.info("从文件加载cookies")
+            if not load_cookies(cookies, self.client):
+                logger.info("文件不存在，将使用扫码登录")
 
     async def __aenter__(self):
         await self.login()
@@ -161,7 +171,7 @@ class NetTool:
         data = response.json()
         isLogin = data["data"]["login"]
         if not isLogin:
-            logger.info("未登录")
+            logger.warning("未登录")
             return 0
         token = data["data"]["st"]
         self.client.cookies.set("XSRF-TOKEN", token)
@@ -169,7 +179,7 @@ class NetTool:
         self.mid = int(data["data"]["uid"])
         return self.mid
 
-    async def user_info(self, user_id: int) -> User:
+    async def user_info(self, user_id: MID) -> User:
         """获取用户信息。
 
         Args:
@@ -183,7 +193,7 @@ class NetTool:
             "x-xsrf-token": await self.get_token(),
         }
         params = {
-            "uid": user_id,
+            "uid": int(user_id),
         }
         response = await self.client.get(
             "https://m.weibo.cn/profile/info", params=params, headers=headers
@@ -191,7 +201,9 @@ class NetTool:
         response.raise_for_status()
         result = response.json()
         user = User.model_validate(result["data"]["user"])
-        user.statuses = [Weibo.model_validate(weibo) for weibo in result["data"]["statuses"]]
+        user.statuses = [
+            Weibo.model_validate(weibo) for weibo in result["data"]["statuses"]
+        ]
         return user
 
     async def post_weibo(self, content: str, visible: const.VISIBLE) -> Optional[Weibo]:
@@ -223,11 +235,10 @@ class NetTool:
             weibo = Weibo.model_validate(result["data"])
             return weibo
         else:
-            logger.error(f"发布微博失败: {result}")
-            return None
+            raise PostWeiboError(result["msg"])
 
     async def repost_weibo(
-        self, mid: Union[str, int], content: str, dualPost: bool
+        self, mid: MID, content: str, dualPost: bool
     ) -> Dict[str, Any]:
         """转发微博。
 
@@ -253,23 +264,7 @@ class NetTool:
         response.raise_for_status()
         return response.json()
 
-    async def extend_weibo(self, mid: Union[str, int]) -> Dict[str, Any]:
-        """获取长微博"""
-        params = {
-            "id": mid,
-        }
-        headers = {
-            "Referer": "https://m.weibo.cn/",
-            "x-xsrf-token": await self.get_token(),
-        }
-        response = await self.client.get(
-            "https://m.weibo.cn/api/statuses/extend", params=params, headers=headers
-        )
-        response.raise_for_status()
-        result = response.json()
-        return result
-
-    async def weibo_info(self, mid: Union[str, int], comments_count: int = 0) -> Weibo:
+    async def weibo_info(self, mid: MID, comments_count: int = 0) -> Weibo:
         """获取微博详细信息。
 
         Args:
@@ -286,14 +281,20 @@ class NetTool:
         response = await self.client.get(url, headers=headers)
         response.raise_for_status()
         r = response.text
+
+        soup = BeautifulSoup(r, "html.parser")
+        error_msg = soup.select_one("body > div > p")
+        if error_msg and error_msg.get_text().strip() == "微博不存在或暂无查看权限!":
+            raise WeiboNotExist(f"微博不存在或暂无查看权限! {mid}")
+
         result = json.loads(
             re.findall(r"(?<=render_data = \[)[\s\S]*(?=\]\[0\])", r)[0]
         )["status"]
         weibo = Weibo.model_validate(result)
-        weibo.comments = await self.get_weibo_comments(mid,comments_count)
+        weibo.comments = await self.get_weibo_comments(mid, comments_count)
         return weibo
 
-    async def get_weibo_comments(self, mid: Union[str, int], count: int = 20) -> List[Comment]:
+    async def get_weibo_comments(self, mid: MID, count: int = 20) -> List[Comment]:
         """获取微博评论。
         Args:
             mid (Union[str, int]): 微博ID
@@ -317,42 +318,40 @@ class NetTool:
                 "max_id": max_id,
                 "max_id_type": 0,
             }
-            
+
             response = await self.client.get(url, headers=headers, params=params)
             response.raise_for_status()
             result = response.json()
-            
+
             if not comments:  # 第一次请求
                 total = result["data"]["total_number"]
                 if count != -1:
                     count = min(count, total)
-            
+
             new_comments = [
                 Comment.model_validate(data)
                 for data in result["data"]["data"]
                 if data["id"] not in [c.id for c in comments]
             ]
             comments.extend(new_comments)
-            
+
             max_id = result["data"]["max_id"]
             if max_id == 0 or (count != -1 and len(comments) >= count):
                 break
-                
+
         return comments if count == -1 else comments[:count]
 
-    
-    async def upload_chat_file(self, tuid: int, file_path: str) -> Dict[str, Any]:
-        #totest: 上传聊天文件
+    async def upload_chat_file(self, tuid: MID, file: Path) -> str:
         """上传聊天文件。
 
         Args:
             tuid (int): 接收者用户ID
-            file_path (str): 文件路径
+            file (Path): 文件路径
 
         Returns:
-            Dict[str, Any]: 上传结果
+            str: 文件ID
         """
-        files = {"file": (file_path, open(file_path, "rb"), "image/jpeg")}
+        files = {"file": (file.name, open(file, "rb"), "image/jpeg")}
         data = {"tuid": tuid, "st": await self.get_token()}
         headers = {
             "Referer": "https://m.weibo.cn/",
@@ -366,19 +365,20 @@ class NetTool:
         )
         response.raise_for_status()
         result = response.json()
-        return result
+        if "fids" not in result.get("data", {}):
+            raise UploadPicError()
+        return result["data"]["fids"]
 
-    async def upload_comment_file(self, file_path: str) -> Dict[str, Any]:
-        #totest: 上传评论图片
+    async def upload_comment_pic(self, file: Path) -> str:
         """上传评论图片。
 
         Args:
-            file_path (str): 图片文件路径
+            file (Path): 图片文件路径
 
         Returns:
-            Dict[str, Any]: 上传结果
+            str: 图片ID
         """
-        files = {"pic": (file_path, open(file_path, "rb"), "image/jpeg")}
+        files = {"pic": (file.name, open(file, "rb"), "image/jpeg")}
         data = {"type": "json", "st": await self.get_token()}
         headers = {
             "Referer": "https://m.weibo.cn/",
@@ -392,21 +392,22 @@ class NetTool:
         )
         response.raise_for_status()
         result = response.json()
-        return result
+        if "pic_id" not in result:
+            raise UploadPicError()
+        return result["pic_id"]
 
     async def send_message(
-        self, uid: Union[str, int], content: str, file_path: str
-    ) -> Dict[str, Any]:
-        #totest: 发送私信
+        self, uid: MID, content: str, file: Optional[Path] = None
+    ) -> ChatDetail:
         """发送私信。
 
         Args:
             uid (Union[str, int]): 接收者用户ID
             content (str): 消息内容
-            file_path (str): 附件文件路径
+            file (Path): 附件文件路径
 
         Returns:
-            Dict[str, Any]: 发送结果
+            ChatDetail: 发送结果
         """
         params = {
             "uid": int(uid),
@@ -417,13 +418,9 @@ class NetTool:
             "Referer": "https://m.weibo.cn/",
             "x-xsrf-token": await self.get_token(),
         }
-        if file_path:
+        if file and file.exists():
             media_type = const.MEDIA.PHOTO.value
-            try:
-                fids = await self.upload_chat_file(tuid=int(uid), file_path=file_path)
-            except Exception as e:
-                logger.error(f"文件上传失败 {e}")
-                return {}
+            fids = await self.upload_chat_file(tuid=uid, file=file)
             params["media_type"] = media_type
             params["content"] = ""
             params["fids"] = fids
@@ -432,10 +429,15 @@ class NetTool:
             "https://m.weibo.cn/api/chat/send", params=params, headers=headers
         )
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+        if result["ok"] == 1:
+            chat_detail = ChatDetail.model_validate(result["data"])
+            return chat_detail
+        else:
+            raise SendMessageError(result["msg"])
 
     async def user_chat(
-        self, uid: Union[str, int], since_id: int = 0, is_continuous=0
+        self, uid: MID, since_id: int = 0, is_continuous=0
     ) -> ChatDetail:
         """获取与指定用户的聊天记录。
 
@@ -448,7 +450,7 @@ class NetTool:
         """
         params = {
             "count": 20,
-            "uid": uid,
+            "uid": int(uid),
             "since_id": since_id,
             "is_continuous": is_continuous,
         }
@@ -486,14 +488,14 @@ class NetTool:
         chat_list = [Chat.model_validate(chat) for chat in result["data"]]
         return chat_list
 
-    async def mentions_cmt(self, page: int = 1) -> Dict[str, Any]:
+    async def mentions_cmt(self, page: int = 1) -> List[Comment]:
         """获取@我的评论。
 
         Args:
             page (int): 页码
 
         Returns:
-            Dict[str, Any]: @我的评论列表
+            List[Comment]: @我的评论列表
         """
         params = {"page": page}
         headers = {
@@ -530,15 +532,14 @@ class NetTool:
         page = Page.model_validate(result["data"])
         return page
 
-    async def like(self, mid: Union[str, int]) -> Dict[str, Any]:
-        #totest
+    async def like_weibo(self, mid: MID) -> bool:
         """点赞微博。
 
         Args:
             mid (Union[str, int]): 微博ID
 
         Returns:
-            Dict[str, Any]: 点赞结果
+            bool: 点赞结果
         """
         params = {
             "id": mid,
@@ -553,9 +554,13 @@ class NetTool:
             "https://m.weibo.cn/api/attitudes/create", params=params, headers=headers
         )
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+        if result["ok"] == 1:
+            return True
+        else:
+            raise LikeWeiboError(result["msg"])
 
-    async def del_weibo(self, mid: Union[str, int]) -> bool:
+    async def del_weibo(self, mid: MID) -> bool:
         """删除微博。
 
         Args:
@@ -577,13 +582,11 @@ class NetTool:
         if result["ok"] == 1:
             return True
         else:
-            logger.error(f"删除微博失败: {result}")
-            return False
+            raise DeleteWeiboError(result["msg"])
 
     async def comment_weibo(
-        self, mid: Union[str, int], content: str, file_path: str = ""
-    ) -> Dict[str, Any]:
-        #totest
+        self, mid: MID, content: str, file: Optional[Path] = None
+    ) -> Comment:
         """评论微博。
 
         Args:
@@ -592,7 +595,7 @@ class NetTool:
             file_path (str, optional): 图片文件路径. 默认为空字符串.
 
         Returns:
-            Dict[str, Any]: 评论结果
+            Comment: 评论结果
         """
         params = {
             "id": mid,
@@ -601,13 +604,9 @@ class NetTool:
             "st": await self.get_token(),
         }
 
-        if file_path:
-            try:
-                pic_ids = await self.upload_comment_file(file_path=file_path)
-            except Exception as e:
-                logger.error(f"文件上传失败 {e}")
-                return {}
-            params["picId"] = pic_ids
+        if file and file.exists():
+            pic_id = await self.upload_comment_pic(file=file)
+            params["picId"] = pic_id
         headers = {
             "Referer": "https://m.weibo.cn/",
             "x-xsrf-token": await self.get_token(),
@@ -616,10 +615,14 @@ class NetTool:
             "https://m.weibo.cn/api/comments/create", params=params, headers=headers
         )
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+        if result["ok"] == 1:
+            comment = Comment.model_validate(result["data"])
+            return comment
+        else:
+            raise CommentError(result["msg"])
 
-    async def del_comment(self, cid: Union[str, int]) -> Dict[str, Any]:
-        #totest
+    async def del_comment(self, cid: CID) -> bool:
         """删除评论。
 
         Args:
@@ -628,7 +631,7 @@ class NetTool:
         Returns:
             Dict[str, Any]: 删除结果
         """
-        params = {"cid": cid, "st": await self.get_token()}
+        params = {"cid": int(cid), "st": await self.get_token()}
         headers = {
             "Referer": "https://m.weibo.cn/",
             "x-xsrf-token": await self.get_token(),
@@ -637,4 +640,8 @@ class NetTool:
             "https://m.weibo.cn/comments/destroy", params=params, headers=headers
         )
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+        if result["ok"] == 1:
+            return True
+        else:
+            raise DeleteCommentError(result["msg"])

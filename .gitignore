@@ -144,3 +144,5 @@ tmp/
 *.json
 qrcode.png
 *.db
+
+test.py

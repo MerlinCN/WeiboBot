@@ -2,7 +2,7 @@
 
 # WeiboBot
 
-_基于微博H5 API开发的机器人框架_
+_基于微博H5 API开发的爬虫框架_
 
 <a href="https://pypi.org/project/WeiboBot/"><img alt="PyPI" src="https://img.shields.io/pypi/v/WeiboBot" /></a></td>
 <a href="https://pypi.org/project/WeiboBot/"><img alt="Python Version" src="https://img.shields.io/pypi/pyversions/WeiboBot" /></a>
@@ -64,17 +64,14 @@ if __name__ == "__main__":
 
 ```python
 import asyncio
-from pathlib import Path
 
 import WeiboBot.const as const
 from WeiboBot import NetTool
 from loguru import logger
 
-cookies = Path("cookies.json")  # 没有会开启扫码登录
-
 
 async def main():
-    async with NetTool(cookies) as nettool:
+    async with NetTool() as nettool:
         user = await nettool.user_info(nettool.mid)
         logger.info(user)
         weibo_example1 = await nettool.weibo_info(123456)  # 获取微博
@@ -94,11 +91,11 @@ if __name__ == "__main__":
 
 目前项目仍在重构中
 
-- [ ] 对旧API的整合
-
-- [ ] 扩展更加多的API
-
-- [ ] 提升登录的健壮性
+- [ ]  对旧API的整合
+- [ ]  扩展更加多的API
+- [ ]  提升登录的健壮性
+- [ ]  增加更多测试用例和自动化
+- [ ]  去掉 logger
 
 ## 示例
 

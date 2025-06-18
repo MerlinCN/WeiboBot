@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
+
+from WeiboBot.typing import MID
 
 if TYPE_CHECKING:
     from WeiboBot.model import User
@@ -47,9 +49,9 @@ class Message(BaseModel):
 
 
 class ChatDetail(BaseModel):
-    total_number: int = Field(description="总数")
-    following: bool = Field(description="是否关注")
-    last_read_mid: int = Field(description="最后阅读的MID")
+    total_number: Optional[int] = Field(description="总数")
+    following: Optional[bool] = Field(description="是否关注")
+    last_read_mid: Optional[int] = Field(description="最后阅读的MID")
     title: str = Field(description="标题")
-    users: Dict[int, "User"] = Field(description="用户列表")
+    users: Dict[MID, "User"] = Field(description="用户列表")
     msgs: List[Message] = Field(description="消息列表")

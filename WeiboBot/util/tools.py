@@ -14,13 +14,15 @@ def save_cookies(cookies_path: Path, client: httpx.AsyncClient):
         json.dump(cookies_dict, f, ensure_ascii=False, indent=4)
 
 
-def load_cookies(cookies_path: Path, client: httpx.AsyncClient):
+def load_cookies(cookies_path: Path, client: httpx.AsyncClient)-> bool:
+    if not cookies_path.exists():
+        return False
     """从文件加载cookies"""
     with open(cookies_path, "r", encoding="utf-8") as f:
         cookies_dict = json.load(f)
     for name, value in cookies_dict.items():
         client.cookies.set(name, value)
-
+    return True
 
 def get_cookies_value(client: httpx.AsyncClient, name: str) -> str:
     for cookie in client.cookies.jar:
