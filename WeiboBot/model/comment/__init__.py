@@ -6,6 +6,7 @@ from ..base import MetaBaseModel
 
 if TYPE_CHECKING:
     from ..user import User
+    from ..weibo import Weibo
 
 
 class Comment(MetaBaseModel):
@@ -24,6 +25,7 @@ class Comment(MetaBaseModel):
     is_followed: bool = Field(False, description="是否已关注评论用户")
     user: "User" = Field(None, description="评论用户")
     comments: Union[List["Comment"], None, bool] = Field(None, description="子评论列表")
+    status: "Weibo" = Field(None, description="微博状态")
 
     class Config:
         extra = "ignore"
