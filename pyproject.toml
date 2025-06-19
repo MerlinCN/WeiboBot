@@ -1,6 +1,6 @@
 [project]
 name = "WeiboBot"
-version = "v1.2.0"
+version = "v1.2.1"
 requires-python = ">=3.11"
 dependencies = [
     "httpx>=0.28.1",
