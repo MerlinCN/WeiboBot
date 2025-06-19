@@ -168,18 +168,14 @@ class Bot(NetTool):
             await self.check_login_status()
         while True:
             try:
-                await asyncio.wait_for(
-                    asyncio.gather(
-                        self.chat_loop(),
-                        self.scan_pages_loop(),
-                        self.mentions_cmt_loop(),
-                        self.tick_loop(),
-                    ),
-                    timeout=30,
+                await asyncio.gather(
+                    self.chat_loop(),
+                    self.scan_pages_loop(),
+                    self.mentions_cmt_loop(),
+                    self.tick_loop(),
                 )
-                logger.debug("Heartbeat - 所有事件处理完成")
-            except asyncio.TimeoutError:
-                logger.warning("事件处理超时")
+            except Exception as e:
+                logger.error(f"事件处理异常: {e}")
             finally:
                 await asyncio.sleep(1)
 
