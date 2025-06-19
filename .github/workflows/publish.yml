@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - 'v*'
-    branches:
-      - main
 
 # 添加权限配置
 permissions:
